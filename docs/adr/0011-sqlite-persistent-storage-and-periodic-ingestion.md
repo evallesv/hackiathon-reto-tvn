@@ -30,7 +30,7 @@ Para persistir estos datos sin depender de bases de datos externas pesadas o con
 3. **Mecanismo de Ingesta Periódica**:
    - `LiveDataFetcher` en `src/hackiathon_reto_tvn/adapters/data/live_fetchers.py` que consume de forma asíncrona mediante `httpx` y `feedparser`.
    - `ingestion_scheduler` en `src/hackiathon_reto_tvn/services/ingestion_scheduler.py` que ejecuta ciclos cada $N$ minutos en segundo plano durante el ciclo de vida de FastAPI.
-   - Script independiente `scripts/periodic_ingestion.py` y comandos del CLI (`hackiathon-tvn ingest`, `hackiathon-tvn db-status`) para ejecuciones programadas y auditoría.
+   - Script independiente `scripts/periodic_ingestion.py` y endpoints de API dedicados para ejecuciones programadas y auditoría.
    - Endpoints de control en API: `GET /api/v1/ingestion/status`, `POST /api/v1/ingestion/trigger`, `GET /api/v1/ingestion/noticias`.
 
 4. **Preservación Hermética del Dataset Congelado**:

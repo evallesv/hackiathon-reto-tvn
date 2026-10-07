@@ -48,11 +48,11 @@ check: lint format-check typecheck test
 run:
 	uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
 
-cli:
-	uv run hackiathon-tvn status
+status:
+	uv run python -c "from hackiathon_reto_tvn.config import get_settings; s = get_settings(); print(f'Env: {s.ENVIRONMENT} | LLM: {s.LLM_PROVIDER} | Decision: {s.DECISION_PROVIDER} | Port: {s.PORT}')"
 
 manifest:
-	uv run hackiathon-tvn manifest
+	uv run python -c "from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository; from hackiathon_reto_tvn.config import get_settings; r = LocalStorageRepository(); cfg = get_settings(); m = r.generate_manifest(cfg.DATA_DIR); print(f'Manifiesto SHA-256 verificado exitosamente con {len(m.archivos)} archivos.')"
 
 docker-build:
 	docker build -t hackiathon-reto-tvn:latest .

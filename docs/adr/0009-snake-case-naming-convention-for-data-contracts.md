@@ -35,7 +35,7 @@ Una revisión encontró una inconsistencia en el contrato `Manifest`: el campo `
 * Una regresión de nombres falla en CI (pruebas) en lugar de depender de la revisión manual.
 
 ### Compromisos
-* **Cambio incompatible** para cualquier cliente que lea `fecha_corte_UTC` de `/api/v1/copilot/manifest` o de un `manifest.json` antiguo: `Manifest.model_validate` rechazará manifiestos con la clave anterior. Un manifiesto antiguo debe regenerarse (`uv run hackiathon-tvn manifest`) o migrarse renombrando la clave.
+* **Cambio incompatible** para cualquier cliente que lea `fecha_corte_UTC` de `/api/v1/copilot/manifest` o de un `manifest.json` antiguo: `Manifest.model_validate` rechazará manifiestos con la clave anterior. Un manifiesto antiguo debe regenerarse (`make manifest`) o migrarse renombrando la clave.
 * Si el reglamento del reto exige literalmente `fecha_corte_UTC` en `manifest.json`, esta decisión debe revisarse antes de la entrega (ver Conformidad).
 
 ## Conformidad con el Reto

@@ -67,15 +67,18 @@ uv run pytest                        # Run all tests with coverage
 uv run pytest tests/test_scoring.py  # Run scoring engine tests
 uv run pytest tests/test_acceptance_t01_t10.py  # Run the 10 mandatory acceptance tests
 
-# Application Execution & CLI
+# Application Execution & Backend Services
 uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
-uv run hackiathon-tvn status         # Inspect copilot status, active Decision model, and LLM provider
-uv run hackiathon-tvn agenda --top 5 # Run prioritization ranking via CLI
-uv run hackiathon-tvn draft          # Generate editorial draft for top case
-uv run hackiathon-tvn manifest       # Recalculate SHA-256 data manifest
-uv run hackiathon-tvn ingest         # Trigger live data ingestion cycle into SQLite storage
-uv run hackiathon-tvn db-status      # Inspect SQLite live storage stats & table counts
+uv run hackiathon-server             # Run ASGI server via packaged script entrypoint
+make status                          # Print runtime config, active Decision model & LLM provider
+make manifest                        # Recalculate SHA-256 data manifest
 uv run python scripts/periodic_ingestion.py  # Standalone live ingestion runner (--continuous / one-shot)
+
+# API Testing (cURL / HTTP)
+curl -s http://localhost:8080/healthz
+curl -s http://localhost:8080/api/v1/copilot/agenda?top_n=5
+curl -s http://localhost:8080/api/v1/ingestion/status
+curl -s -X POST http://localhost:8080/api/v1/ingestion/trigger
 
 # GitHub Tasks & CI/CD Management (via gh CLI)
 gh issue list                        # View open issues and acceptance test status
@@ -127,7 +130,6 @@ hackiathon-reto-tvn/
 │   │   └── ingestion_scheduler.py# Background periodic ingestion loop (lifespan managed)
 │   ├── api/                  # FASTAPI WEB LAYER
 │   │   └── routes.py         # /healthz, /api/v1/copilot/*, /api/v1/ingestion/* endpoints
-│   ├── cli.py                # Command line interface (hackiathon-tvn)
 │   └── main.py               # ASGI application entrypoint with background lifespan
 ├── data/
 │   ├── raw/                  # Frozen raw datasets (noticias.csv, indicadores.csv, etc.)
@@ -248,7 +250,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 
 ### Operational gotchas
 - **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.
-- **`data/manifest.json` is frozen.** Only the deliberate command `uv run hackiathon-tvn manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
+- **`data/manifest.json` is frozen.** Only the deliberate command `make manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
 - **Persistent Live Storage vs Frozen Dataset**: Live data ingestion stores real-time feeds in SQLite (`copilot.db`), leaving `data/raw/` and `data/manifest.json` completely untouched. Local development uses `data/storage/` (gitignored).
 - **Offline test isolation for live ingestion**: `INGESTION_ENABLED="false"` is forced via autouse fixture in `tests/conftest.py` so scheduler and fetchers never trigger network requests in test suites (**T10**).
 - **SQLite Concurrency & WAL mode**: The SQLite adapter enforces `PRAGMA journal_mode=WAL;` and `PRAGMA busy_timeout=5000;` to ensure non-blocking concurrent operations between FastAPI requests and background ingestion.

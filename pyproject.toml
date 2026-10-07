@@ -21,7 +21,6 @@ dependencies = [
 ]
 
 [project.scripts]
-hackiathon-tvn = "hackiathon_reto_tvn.cli:main"
 hackiathon-server = "hackiathon_reto_tvn.main:start"
 
 [build-system]

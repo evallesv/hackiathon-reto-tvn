@@ -67,9 +67,8 @@ hackiathon-reto-tvn/
 │   │   ├── llm/                     # OpenCode, Gemini, Mock LLM
 │   │   └── data/                    # Loaders congelados, Live fetchers y SQLite storage
 │   ├── services/                    # Orquestación (CopilotService, IngestionScheduler)
-│   ├── api/                         # FastAPI endpoints (/healthz, agenda, borrador, contradicciones, ingesta)
-│   ├── cli.py                       # CLI interactivo (hackiathon-tvn status, agenda, draft, ingest, db-status)
-│   └── main.py                      # Punto de entrada ASGI con lifespan worker
+│   ├── api/                         # FastAPI REST API (/healthz, agenda, borrador, contradicciones, ingesta)
+│   └── main.py                      # Punto de entrada ASGI con lifespan worker y hackiathon-server
 ├── data/
 │   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson (congelado)
 │   ├── benchmark.jsonl              # 60 consultas de evaluación
@@ -78,7 +77,7 @@ hackiathon-reto-tvn/
 ├── tests/                           # Suite pytest (scoring, decision, llm, safety, storage, T01-T10)
 ├── Dockerfile                       # Multi-stage optimizado con uv y volumen /data
 ├── fly.toml                         # Especificación para contenedores y volumen sentria_data
-├── Makefile                         # Comandos de ingeniería (make check)
+├── Makefile                         # Comandos de ingeniería (make check, make run, make manifest)
 └── pyproject.toml                   # Dependencias fijadas y herramientas de calidad
 ```
 
@@ -148,47 +147,45 @@ INGESTION_INTERVAL_MINUTES=60
 
 ---
 
-## 💻 Uso del CLI y API
+## 🌐 Interfaz API REST y Ejecución del Servidor
 
-### Comandos del CLI
+El copiloto opera como un **Backend API REST de alto rendimiento**, diseñado para alimentar interfaces web editoriales, dashboards y aplicaciones frontend.
+
+### 1. Iniciar Servidor Backend
 ```bash
-# Consultar el estado del sistema y conectores activos
-uv run hackiathon-tvn status
-
-# Calcular agenda priorizada (Top 5)
-uv run hackiathon-tvn agenda --top 5
-
-# Generar y validar manifiesto criptográfico SHA-256
-uv run hackiathon-tvn manifest
-
-# Generar borrador editorial para el caso prioritario
-uv run hackiathon-tvn draft
-
-# Ejecutar ciclo de ingesta en vivo (TVN RSS, GDELT, Banco Mundial, USGS)
-uv run hackiathon-tvn ingest
-
-# Consultar estadísticas de la base de datos SQLite y volumen persistente
-uv run hackiathon-tvn db-status
-
-# (Opcional) Ejecutar worker continuo de ingesta periódica en background
-uv run python scripts/periodic_ingestion.py --continuous --interval 60
-```
-
-### Levantar Servidor Local
-```bash
-# Iniciar servidor FastAPI en http://0.0.0.0:8080
+# Iniciar servidor backend FastAPI en http://0.0.0.0:8080
 uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
+
+# O mediante el comando empaquetado
+uv run hackiathon-server
 ```
-Endpoints principales:
+
+### 2. Documentación Interactiva (Swagger / OpenAPI)
+Una vez iniciado el servidor, accede a la documentación interactiva y explorador de API:
+* **Swagger UI**: `http://localhost:8080/docs`
+* **Redoc**: `http://localhost:8080/redoc`
+* **OpenAPI JSON**: `http://localhost:8080/openapi.json`
+
+### 3. Endpoints Principales del Backend
 * `GET /healthz` — Chequeo de salud para orquestadores y balanceadores.
 * `GET /api/v1/system/info` — Estado del runtime, conector de decisión y proveedor LLM activo.
 * `GET /api/v1/copilot/agenda?top_n=5` — Ranking de noticias priorizadas con componentes explicados.
 * `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion con citas verificadas.
 * `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).
 * `POST /api/v1/copilot/review` — Máquina de estados de revisión humana (`en_revision`, `aprobado_como_borrador`, etc.).
+* `GET /api/v1/copilot/manifest` — Consulta del manifiesto criptográfico SHA-256.
 * `GET /api/v1/ingestion/status` — Estadísticas de almacenamiento SQLite y auditoría de ingesta.
 * `POST /api/v1/ingestion/trigger` — Disparo manual de ciclo de ingesta en vivo.
 * `GET /api/v1/ingestion/noticias?limit=20` — Consulta de noticias vivas persistidas en SQLite.
+
+### 4. Scripts y Comandos de Utilidad
+```bash
+# Generar o verificar manifiesto criptográfico SHA-256
+make manifest
+
+# Ejecutar ciclo de ingesta continua en segundo plano
+uv run python scripts/periodic_ingestion.py --continuous --interval 60
+```
 
 ---
 

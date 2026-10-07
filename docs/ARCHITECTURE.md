@@ -11,14 +11,12 @@ El sistema sigue estrictamente el patrón de **Arquitectura Hexagonal (Ports & A
 ```mermaid
 graph TD
     subgraph "Entrada / Clientes"
-        CLI["CLI: hackiathon-tvn"]
-        API["FastAPI HTTP / JSON"]
-        WebDash["Dashboard / Interfaz"]
+        WebDash["Dashboard / Aplicación Web Editorial"]
+        APIClient["Clientes HTTP / cURL / Orquestadores"]
     end
 
     subgraph "Adaptadores Primarios (Inbound Adapters)"
-        Router["api/routes.py"]
-        CLICmd["cli.py"]
+        Router["api/routes.py (FastAPI REST API)"]
     end
 
     subgraph "Capa de Aplicación y Servicios"
