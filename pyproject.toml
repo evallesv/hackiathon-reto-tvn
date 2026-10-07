@@ -1,0 +1,68 @@
+[project]
+name = "hackiathon-reto-tvn"
+version = "0.1.0"
+description = "De la señal a la decisión: Copiloto de inteligencia informativa con IA para TVN Media"
+readme = "README.md"
+authors = [
+    { name = "Eduardo Valle", email = "368953+evallesv@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "feedparser>=6.0.11",
+    "google-genai>=1.0.0",
+    "httpx>=0.28.0",
+    "openai>=1.50.0",
+    "pandas>=2.2.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "python-dotenv>=1.0.1",
+    "uvicorn[standard]>=0.32.0",
+]
+
+[project.scripts]
+hackiathon-tvn = "hackiathon_reto_tvn.cli:main"
+hackiathon-server = "hackiathon_reto_tvn.main:start"
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.13.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.8.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-v --cov=hackiathon_reto_tvn --cov-report=term-missing"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "A", "C4"]
+ignore = ["B008", "E501", "N815"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
