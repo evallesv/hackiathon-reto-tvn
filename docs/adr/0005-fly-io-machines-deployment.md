@@ -20,15 +20,18 @@ Requisitos técnicos clave para evitar los fallos más frecuentes en Fly.io:
    * Ejecución de `uv sync --frozen --no-dev` para preparar el entorno virtual de producción.
    * Etapa final con `python:3.12-slim-bookworm`, creando un usuario no privilegiado (`appuser`) por seguridad.
 2. **Configuración de `fly.toml`**:
+   * Nombre de aplicación: `sentria-tvn` (dominio público: `https://sentria-tvn.fly.dev`).
+   * Región primaria: `dfw` (Dallas Fort Worth, óptima para Centroamérica y el Caribe).
    * `internal_port = 8080`.
    * Endpoint de monitoreo `/healthz` con chequeo HTTP cada 15 segundos.
    * Configuración de escalado a cero (`auto_stop_machines = "stop"`, `auto_start_machines = true`) para optimizar costos de máquina cuando no reciba peticiones.
-3. **Flujo de Despliegue**:
-   * Despliegue automatizado mediante GitHub Actions (`.github/workflows/fly-deploy.yml`) y comando manual `fly deploy`.
+3. **Flujo de Despliegue y Conexión de Repositorio**:
+   * Despliegue automatizado continuo mediante GitHub Actions (`.github/workflows/fly-deploy.yml`) conectado con secreto `FLY_API_TOKEN`.
+   * Despliegue bajo demanda con `fly deploy`.
 
 ## Consecuencias
 
 ### Positivas
-* Despliegue reproducible con tamaño mínimo de imagen (< 150MB).
-* Arranque rápido de máquinas en regiones cercanas (ej. `iad` o `mia`).
+* Despliegue reproducible con tamaño mínimo de imagen (< 100MB).
+* Arranque rápido de máquinas en la región `dfw` (Dallas Fort Worth).
 * Trazabilidad de salud operativa mediante `/healthz`.
