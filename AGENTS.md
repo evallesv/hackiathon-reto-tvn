@@ -8,7 +8,7 @@
 
 ## 1. Project Overview
 
-This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation.
+This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation. Additionally, it integrates a persistent SQLite storage layer on Fly.io volumes (`copilot.db` in WAL mode) for periodic live ingestion from RSS, GDELT, World Bank, and USGS, strictly decoupled from the frozen benchmark dataset to maintain 100% deterministic reproducibility.
 
 **Core Architectural Pattern**: Clean Architecture / Hexagonal (Ports & Adapters). Domain rules have zero dependencies on frameworks, network I/O, or specific LLM providers.
 
@@ -67,11 +67,15 @@ uv run pytest                        # Run all tests with coverage
 uv run pytest tests/test_scoring.py  # Run scoring engine tests
 uv run pytest tests/test_acceptance_t01_t10.py  # Run the 10 mandatory acceptance tests
 
-# Application Execution
+# Application Execution & CLI
 uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
 uv run hackiathon-tvn status         # Inspect copilot status, active Decision model, and LLM provider
 uv run hackiathon-tvn agenda --top 5 # Run prioritization ranking via CLI
+uv run hackiathon-tvn draft          # Generate editorial draft for top case
 uv run hackiathon-tvn manifest       # Recalculate SHA-256 data manifest
+uv run hackiathon-tvn ingest         # Trigger live data ingestion cycle into SQLite storage
+uv run hackiathon-tvn db-status      # Inspect SQLite live storage stats & table counts
+uv run python scripts/periodic_ingestion.py  # Standalone live ingestion runner (--continuous / one-shot)
 
 # GitHub Tasks & CI/CD Management (via gh CLI)
 gh issue list                        # View open issues and acceptance test status
@@ -81,6 +85,7 @@ gh workflow run fly-deploy.yml       # Trigger deployment workflow manually
 # Deployment & Ops (Automated via GitHub Actions; local ops via flyctl)
 # Reference: [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io)
 fly status                           # Inspect Fly Machines status
+fly volumes list                     # List attached persistent volumes (sentria_data)
 fly logs                             # Stream remote server logs
 fly secrets set KEY=VALUE            # Inject remote runtime secrets
 fly deploy                           # Deploy Machines image from Dockerfile
@@ -114,23 +119,29 @@ hackiathon-reto-tvn/
 │   │   │   ├── mock_adapter.py            # Deterministic offline provider (T10 & CI)
 │   │   │   └── factory.py                 # Provider factory (get_llm_client)
 │   │   └── data/
-│   │       └── loaders.py    # Non-blocking CSV, GeoJSON & SHA-256 manifest
+│   │       ├── loaders.py        # Non-blocking CSV, GeoJSON & SHA-256 manifest (frozen data)
+│   │       ├── live_fetchers.py  # Live RSS, GDELT, World Bank, USGS feed collectors
+│   │       └── sqlite_storage.py # SQLite WAL repository for persistent live feeds
 │   ├── services/             # ORCHESTRATION & USE CASES
-│   │   └── copilot_service.py# Prioritization, editorial package generation, review, contradictions
+│   │   ├── copilot_service.py    # Prioritization, editorial package generation, review, contradictions
+│   │   └── ingestion_scheduler.py# Background periodic ingestion loop (lifespan managed)
 │   ├── api/                  # FASTAPI WEB LAYER
-│   │   └── routes.py         # /healthz, /api/v1/copilot/* endpoints
+│   │   └── routes.py         # /healthz, /api/v1/copilot/*, /api/v1/ingestion/* endpoints
 │   ├── cli.py                # Command line interface (hackiathon-tvn)
-│   └── main.py               # ASGI application entrypoint
+│   └── main.py               # ASGI application entrypoint with background lifespan
 ├── data/
 │   ├── raw/                  # Frozen raw datasets (noticias.csv, indicadores.csv, etc.)
+│   ├── storage/              # Local SQLite database (copilot.db) (ignored by git)
 │   ├── manifest.json         # Cryptographic SHA-256 manifest
 │   └── benchmark.jsonl       # 60 benchmark evaluation queries
+├── scripts/
+│   └── periodic_ingestion.py # Standalone live ingestion runner (--continuous / one-shot)
 ├── docs/
-│   ├── adr/                  # Architecture Decision Records (ADR-0001 to ADR-0010)
+│   ├── adr/                  # Architecture Decision Records (ADR-0001 to ADR-0011)
 │   └── ARCHITECTURE.md       # C4 diagrams and sequence flows
 ├── tests/                    # Pytest test suite (100% passing required)
-├── Dockerfile                # Multi-stage production container with uv
-└── fly.toml                  # Cloud container deployment spec (internal_port 8080)
+├── Dockerfile                # Multi-stage production container with uv and /data mount
+└── fly.toml                  # Cloud container deployment spec (internal_port 8080, sentria_data mount)
 ```
 
 ### Boundary Rules
@@ -238,6 +249,10 @@ These are verified limitations of the current code. Do not assume the behaviour 
 ### Operational gotchas
 - **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.
 - **`data/manifest.json` is frozen.** Only the deliberate command `uv run hackiathon-tvn manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
+- **Persistent Live Storage vs Frozen Dataset**: Live data ingestion stores real-time feeds in SQLite (`copilot.db`), leaving `data/raw/` and `data/manifest.json` completely untouched. Local development uses `data/storage/` (gitignored).
+- **Offline test isolation for live ingestion**: `INGESTION_ENABLED="false"` is forced via autouse fixture in `tests/conftest.py` so scheduler and fetchers never trigger network requests in test suites (**T10**).
+- **SQLite Concurrency & WAL mode**: The SQLite adapter enforces `PRAGMA journal_mode=WAL;` and `PRAGMA busy_timeout=5000;` to ensure non-blocking concurrent operations between FastAPI requests and background ingestion.
+- **Fly.io Volume Mount**: On Fly.io, persistent volume `sentria_data` mounts to `/data`, configuring `SQLITE_DB_PATH=/data/copilot.db`.
 - **Recirculation (T03)** compares calendar dates with a threshold (`EventGrouper.RECIRCULATION_THRESHOLD_DAYS`), never raw timestamp strings.
 - **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, a draft with <100% citation coverage raises `ValueError` (HTTP 400).
 - **Sandboxed shells** may fail git with `unable to access ~/.gitconfig`; prefix with `GIT_CONFIG_GLOBAL=/dev/null` for read-only git commands.
@@ -251,9 +266,12 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | `domain/scoring.py` | `tests/test_scoring.py` |
 | `domain/safety.py`, prompt isolation | `tests/test_safety.py`, `tests/test_domain_invariants.py` |
 | `adapters/data/loaders.py` | `tests/test_data_loaders.py` (+ T01–T04 in acceptance file) |
+| `adapters/data/sqlite_storage.py` | `tests/test_sqlite_storage.py` |
+| `adapters/data/live_fetchers.py` | `tests/test_live_fetchers.py` |
 | `adapters/decision/*` | `tests/test_decision_adapters.py` (always offline/mock in tests) |
 | `adapters/llm/*` | `tests/test_llm_adapters.py` (always offline; never call real providers in tests) |
 | `services/copilot_service.py` | `tests/test_domain_invariants.py` |
+| `services/ingestion_scheduler.py` | `tests/test_scheduler.py` |
 | `api/routes.py` | `tests/test_api.py` |
 | Any new T01–T10 behaviour | `tests/test_acceptance_t01_t10.py` |
 

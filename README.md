@@ -41,6 +41,9 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
    - Backlog, milestones y las 10 pruebas de aceptación (**T01 a T10**) auditables vía `gh issue`.
 8. **Espacio Notion Business**:
    - Cumplimiento de las 8 bases obligatorias de la Sección 5 del reto.
+9. **Almacenamiento Persistente SQLite e Ingesta de Datos Vivos**:
+   - Ingesta periódica en segundo plano desde TVN Noticias RSS, GDELT DOC 2.0, Banco Mundial y catálogo sísmico USGS.
+   - Base de datos relacional SQLite con modo WAL montada sobre volumen persistente en Fly.io (`/data/copilot.db`), garantizando enriquecimiento continuo sin alterar el corpus congelado del jurado ([ADR-0011](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)).
 
 ---
 
@@ -52,7 +55,7 @@ El proyecto implementa **Arquitectura Hexagonal (Ports & Adapters)**:
 hackiathon-reto-tvn/
 ├── AGENTS.md                        # Protocolo y directrices para agentes de IA
 ├── docs/
-│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0010)
+│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0011)
 │   ├── notion_spec/                 # Especificación de las 8 bases para Notion Business
 │   └── ARCHITECTURE.md              # Diagrama C4, secuencias y modelos de datos
 ├── src/hackiathon_reto_tvn/
@@ -62,19 +65,19 @@ hackiathon-reto-tvn/
 │   ├── adapters/                    # Implementaciones tecnológicas
 │   │   ├── decision/                # Cloudflare Clef, TypeSafe Jev, Mock decision
 │   │   ├── llm/                     # OpenCode, Gemini, Mock LLM
-│   │   └── data/                    # CSV, GeoJSON loaders y manifest SHA-256
-│   ├── services/                    # Orquestación y concurrencia (CopilotService)
-│   ├── api/                         # FastAPI endpoints (/healthz, agenda, borrador, contradicciones)
-│   ├── cli.py                       # CLI interactivo (hackiathon-tvn)
-│   └── main.py                      # Punto de entrada ASGI
+│   │   └── data/                    # Loaders congelados, Live fetchers y SQLite storage
+│   ├── services/                    # Orquestación (CopilotService, IngestionScheduler)
+│   ├── api/                         # FastAPI endpoints (/healthz, agenda, borrador, contradicciones, ingesta)
+│   ├── cli.py                       # CLI interactivo (hackiathon-tvn status, agenda, draft, ingest, db-status)
+│   └── main.py                      # Punto de entrada ASGI con lifespan worker
 ├── data/
-│   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson
+│   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson (congelado)
 │   ├── benchmark.jsonl              # 60 consultas de evaluación
 │   └── manifest.json                # Manifiesto criptográfico con hashes SHA-256
 ├── scripts/                         # Automatización e ingesta periódica (periodic_ingestion.py)
-├── tests/                           # Suite pytest (scoring, decision, llm, safety, T01-T10)
-├── Dockerfile                       # Multi-stage optimizado con uv
-├── fly.toml                         # Especificación para contenedores en nube
+├── tests/                           # Suite pytest (scoring, decision, llm, safety, storage, T01-T10)
+├── Dockerfile                       # Multi-stage optimizado con uv y volumen /data
+├── fly.toml                         # Especificación para contenedores y volumen sentria_data
 ├── Makefile                         # Comandos de ingeniería (make check)
 └── pyproject.toml                   # Dependencias fijadas y herramientas de calidad
 ```
@@ -166,6 +169,9 @@ uv run hackiathon-tvn ingest
 
 # Consultar estadísticas de la base de datos SQLite y volumen persistente
 uv run hackiathon-tvn db-status
+
+# (Opcional) Ejecutar worker continuo de ingesta periódica en background
+uv run python scripts/periodic_ingestion.py --continuous --interval 60
 ```
 
 ### Levantar Servidor Local
@@ -237,7 +243,12 @@ El ciclo de integración y despliegue continuo se orquesta completamente a trav�
 La solución está empaquetada como un contenedor Docker estándar e independiente de infraestructura. Actualmente se encuentra desplegada sobre **Fly.io**, pero gracias al diseño hexagonal y desacoplado, puede ser desplegada de manera transparente en proveedores cloud corporativos como **AWS** (mediante Amazon ECS, AWS App Runner o EKS) sin requerir modificaciones en el código fuente.
 
 Para operaciones directas o inspección local de la infraestructura actual:
-* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io).
+* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io):
+  ```bash
+  fly status                           # Estado de máquinas
+  fly volumes list                     # Volúmenes persistentes montados (sentria_data)
+  fly logs                             # Logs en tiempo real
+  ```
 
 ---
 
