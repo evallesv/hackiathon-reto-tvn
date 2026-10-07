@@ -2,12 +2,13 @@
 # Makefile - HackIAthon TVN Media Engineering Automation
 # ==============================================================================
 
-.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest
+.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks
 
 help:
 	@echo "Comandos disponibles:"
-	@echo "  make install       - Instalar uv y sincronizar dependencias de desarrollo"
+	@echo "  make install       - Instalar uv, sincronizar dependencias y configurar git hooks"
 	@echo "  make sync          - Sincronizar dependencias bloqueadas con uv sync"
+	@echo "  make setup-hooks   - Configurar git hooks locales (protección de rama main)"
 	@echo "  make lint          - Ejecutar ruff check"
 	@echo "  make format        - Formatear código con ruff format"
 	@echo "  make format-check  - Verificar formato sin modificar archivos"
@@ -24,6 +25,12 @@ help:
 
 install:
 	uv sync
+	@$(MAKE) setup-hooks
+
+setup-hooks:
+	git config core.hooksPath .githooks
+	chmod +x .githooks/*
+	@echo "Git hooks locales configurados exitosamente en .githooks/."
 
 sync:
 	uv sync --frozen

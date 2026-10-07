@@ -254,6 +254,29 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0009: Convención de Nombres `snake_case` para Contratos de Datos y API](docs/adr/0009-snake-case-naming-convention-for-data-contracts.md)
 * [ADR-0010: Modelos de Decisión System One (Cloudflare Clef y TypeSafe Jev) para Clasificación y Scoring](docs/adr/0010-system-one-decision-models-cloudflare-clef-and-jev.md)
 * [ADR-0011: Almacenamiento Persistente SQLite en Fly.io Volumes e Ingesta Periódica de Fuentes Vivas](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)
+* [ADR-0012: Flujo Git para Desarrollo Multi-Agente, Estandarización en AGENTS.md y Protección de Main](docs/adr/0012-multi-agent-git-workflow-and-main-protection.md)
+
+---
+
+## 🌿 Flujo Git y Desarrollo Colaborativo Multi-Agente
+
+Para garantizar la estabilidad del servicio en producción (Fly.io) y facilitar el trabajo concurrente entre múltiples desarrolladores y agentes de IA:
+
+1. **Protección de Producción (`main`)**: La rama `main` despliega automáticamente a producción. **Está terminantemente prohibido hacer commits o pushes directos a `main`**.
+2. **Ciclo de Trabajo con Ramas**:
+   ```bash
+   git fetch origin
+   git checkout -b feat/<nombre-tarea> origin/main
+   # Desarrollar y verificar con make check
+   git add <archivos>
+   git commit -m "feat(alcance): descripción clara"
+   # Mantener historial lineal y limpio antes de subir
+   git fetch origin && git rebase origin/main
+   git push -u origin feat/<nombre-tarea>
+   gh pr create --fill
+   ```
+3. **Validación Previa (`make check`)**: Todo cambio debe pasar el gate completo (`ruff`, `mypy`, `pytest` 60/60) antes de solicitar revisión.
+4. **Protección Local de Git**: Configure el hook pre-push ejecutando `make setup-hooks` para bloquear pushes accidentales a `main`.
 
 ---
 
@@ -261,3 +284,4 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 
 El espacio oficial de Notion Business contiene las 8 secciones obligatorias para la presentación final ante el jurado:
 Consulte la guía de integración y esquemas en [`docs/notion_spec/README.md`](docs/notion_spec/README.md).
+

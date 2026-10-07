@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Git Pre-Push Hook: Proteger la rama 'main' contra pushes directos
+# ==============================================================================
+# En hackiathon-reto-tvn, la rama 'main' dispara automáticamente el despliegue
+# a producción en Fly.io vía GitHub Actions (.github/workflows/fly-deploy.yml).
+# Todo cambio DEBE ingresar mediante un Pull Request tras pasar CI (make check)
+# y revisión humana de código.
+# ==============================================================================
+
+remote="$1"
+url="$2"
+
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ]; then
+        if [ "$local_sha" = "$zero" ]; then
+            echo "❌ ERROR: No está permitido eliminar la rama 'main'." >&2
+            exit 1
+        fi
+
+        echo "" >&2
+        echo "🚨 =====================================================================" >&2
+        echo "❌ OPERACIÓN BLOQUEADA: PUSH DIRECTO A 'main' PROHIBIDO" >&2
+        echo "=====================================================================" >&2
+        echo "La rama 'main' está vinculada al despliegue continuo de producción en Fly.io." >&2
+        echo "Cualquier commit directo puede tumbar producción o introducir regresiones." >&2
+        echo "" >&2
+        echo "📌 Protocolo obligatorio:" >&2
+        echo "  1. Crea una rama de funcionalidad/corrección:" >&2
+        echo "     git checkout -b feat/<nombre-tarea> o fix/<nombre-tarea>" >&2
+        echo "  2. Realiza tus commits según Conventional Commits (feat:, fix:, etc.)" >&2
+        echo "  3. Verifica que la suite pase al 100%: make check" >&2
+        echo "  4. Envía tu rama al repositorio remoto:" >&2
+        echo "     git push -u origin <nombre-de-tu-rama>" >&2
+        echo "  5. Abre un Pull Request hacia 'main':" >&2
+        echo "     gh pr create --fill" >&2
+        echo "=====================================================================" >&2
+        echo "" >&2
+        exit 1
+    fi
+done
+
+exit 0
