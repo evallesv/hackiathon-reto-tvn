@@ -6,6 +6,7 @@ from typing import Any, Type, TypeVar
 from pydantic import BaseModel
 
 from hackiathon_reto_tvn.domain.models import (
+    BorradorBancario,
     BorradorEditorial,
 )
 from hackiathon_reto_tvn.domain.safety import SafetyGuard
@@ -111,6 +112,43 @@ class MockLLMAdapter(BaseLLMClient):
                 "basado_unicamente_en_titular_metadatos": True,
             }
             return response_model.model_validate(data)
+
+        # Handle BorradorBancario schema specifically (CU-05)
+        if response_model == BorradorBancario:
+            source_match = re.search(r'<source_data id="([^"]+)">', prompt)
+            cited_id = source_match.group(1) if source_match else "PAN-NY.GDP.MKTP.KD.ZG-2023"
+            data_bancaria = {
+                "resumen_250": (
+                    "Boletín de entorno macroeconómico y logístico para análisis sectorial en Panamá. "
+                    "Se registran señales sobre actividad portuaria e indicadores agregados sin evaluar clientes individuales."
+                ),
+                "sectores_relacionados": ["logística", "transporte marítimo", "comercio exterior"],
+                "horizonte_temporal": "2024Q1 - 2024Q4",
+                "evidencia": [f"Registro oficial {cited_id}"],
+                "preguntas_analista": [
+                    "¿Cuál es la elasticidad del volumen de carga ante variaciones de calado en el Canal?",
+                    "¿Cómo impacta la tendencia de crecimiento del PIB en la demanda de crédito comercial?",
+                    "¿Qué exposición agregada presenta la cartera logística ante cambios en peajes?",
+                ],
+                "observacion": "Los datos oficiales reflejan estabilidad en el flujo logístico regional.",
+                "hipotesis_impacto": "La normalización del calado podría sostener el ritmo de transacciones en el sector servicios.",
+                "afirmaciones": [
+                    {
+                        "id_afirmacion": "AF-BANC-001",
+                        "texto": "Se reportó un ajuste en el calado operativo para buques neopanamax.",
+                        "tipo": "hecho",
+                        "citas": [
+                            {
+                                "id_fuente": cited_id,
+                                "campo_o_pasaje": "indicador_o_titular",
+                                "texto_sustento": "Ajuste de calado y series macroeconómicas",
+                                "url_fuente": "https://mef.gob.pa/estadisticas",
+                            }
+                        ],
+                    }
+                ],
+            }
+            return response_model.model_validate(data_bancaria)
 
         # Generic dummy instance for other Pydantic models
         try:

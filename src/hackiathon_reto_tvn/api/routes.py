@@ -7,10 +7,13 @@ from pydantic import BaseModel, Field
 
 from hackiathon_reto_tvn.config import Settings, get_settings
 from hackiathon_reto_tvn.domain.models import (
+    BorradorBancario,
     BorradorEditorial,
     EstadoRevision,
     FichaCaso,
     Manifest,
+    QueryRequest,
+    QueryResponse,
 )
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
@@ -38,18 +41,6 @@ class ReviewUpdateRequest(BaseModel):
 class ContradictionRequest(BaseModel):
     texto_a: str = Field(..., description="Primera versión o afirmación")
     texto_b: str = Field(..., description="Segunda versión o afirmación")
-
-
-class QueryRequest(BaseModel):
-    consulta: str = Field(..., description="Pregunta del usuario o jurado")
-    modalidad: str = "tvn_editorial"
-
-
-class QueryResponse(BaseModel):
-    consulta: str
-    respuesta: str
-    es_abstencion: bool
-    citas: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 def get_copilot_service(settings: Settings = Depends(get_settings)) -> CopilotService:
@@ -115,6 +106,31 @@ async def generate_draft(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.post("/api/v1/copilot/generate-banking-draft", response_model=BorradorBancario, tags=["Copilot"])
+async def generate_banking_draft(
+    caso: FichaCaso,
+    service: CopilotService = Depends(get_copilot_service),
+) -> BorradorBancario:
+    """Generates an economic and logistics environment bulletin for banking analysts (CU-05)."""
+    try:
+        borrador = await service.generate_banking_bulletin(caso)
+        return borrador
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/api/v1/copilot/query", response_model=QueryResponse, tags=["Copilot"])
+async def query_copilot(
+    req: QueryRequest,
+    service: CopilotService = Depends(get_copilot_service),
+) -> QueryResponse:
+    """Answers analytical or editorial questions with citations or explicit abstention (T04, T05, T06, T07)."""
+    return await service.answer_query_async(consulta=req.consulta, modalidad=req.modalidad)
 
 
 @router.post("/api/v1/copilot/review", response_model=FichaCaso, tags=["Human-in-the-loop"])

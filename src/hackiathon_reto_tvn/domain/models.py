@@ -185,3 +185,15 @@ class Manifest(BaseModel):
     cantidad_por_archivo: dict[str, int]
     licencia_condiciones: str
     archivos: list[ManifestItem]
+
+
+class QueryRequest(BaseModel):
+    consulta: str = Field(..., description="Pregunta del usuario o jurado")
+    modalidad: str = "tvn_editorial"
+
+
+class QueryResponse(BaseModel):
+    consulta: str
+    respuesta: str
+    es_abstencion: bool
+    citas: list[dict[str, Any]] = Field(default_factory=list)
