@@ -3,7 +3,7 @@
 # Specification: https://fly.io/agent-ready.md
 # ==============================================================================
 
-app = "hackiathon-reto-tvn"
+app = "sentria-tvn"
 primary_region = "mia"
 
 [build]
@@ -16,6 +16,8 @@ primary_region = "mia"
   LLM_PROVIDER = "opencode"
   OPENCODE_MODEL = "muse-spark-1.3-contributor-free"
   OPENCODE_BASE_URL = "https://api.opencode.ai/v1"
+  DECISION_PROVIDER = "cloudflare"
+  CLOUDFLARE_DECISION_MODEL = "@cf/cloudflare/clef"
 
 [http_service]
   internal_port = 8080
