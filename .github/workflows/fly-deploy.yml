@@ -10,12 +10,29 @@ jobs:
   deploy:
     name: Deploy to Fly.io Machines
     runs-on: ubuntu-latest
-    if: ${{ secrets.FLY_API_TOKEN != '' }}
     concurrency: deploy-group
     steps:
-      - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check FLY_API_TOKEN availability
+        id: check_token
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FLY_API_TOKEN secret is not configured in repository settings. Deployment skipped."
+          else
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Setup flyctl
+        if: steps.check_token.outputs.has_token == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
       - name: Deploy application
+        if: steps.check_token.outputs.has_token == 'true'
         run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
