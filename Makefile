@@ -2,7 +2,7 @@
 # Makefile - HackIAthon TVN Media Engineering Automation
 # ==============================================================================
 
-.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks
+.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks benchmark
 
 help:
 	@echo "Comandos disponibles:"
@@ -15,6 +15,7 @@ help:
 	@echo "  make typecheck     - Verificar tipos estáticos con mypy"
 	@echo "  make check         - Gate completo: ruff + format-check + mypy + pytest (ejecutar antes de terminar)"
 	@echo "  make test          - Ejecutar suite completa con pytest y cobertura"
+	@echo "  make benchmark     - Ejecutar suite de evaluación de 60 consultas y baselines de IA"
 	@echo "  make run           - Levantar servidor FastAPI localmente en puerto 8080"
 	@echo "  make cli           - Ver estado del CLI del copiloto"
 	@echo "  make manifest      - Regenerar manifest.json con hashes SHA-256"
@@ -49,6 +50,9 @@ typecheck:
 
 test:
 	uv run pytest
+
+benchmark:
+	uv run python scripts/run_benchmark.py
 
 check: lint format-check typecheck test
 

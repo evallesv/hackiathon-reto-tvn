@@ -18,19 +18,29 @@ from hackiathon_reto_tvn.domain.models import Afirmacion, TipoAfirmacion
 class SafetyGuard:
     """Security and compliance shields for AI engineering copilot."""
 
-    # Common prompt injection patterns
+    # Common prompt injection and adversarial manipulation patterns
     INJECTION_PATTERNS = [
         r"ignore\s+(all\s+)?(previous|prior)\s+instructions",
         r"ignora\s+(todas\s+las\s+)?instrucciones\s+(previas|anteriores)",
-        r"system\s+prompt",
-        r"revela\s+(el\s+)?(prompt|secreto|clave|token)",
-        r"reveal\s+(the\s+)?(prompt|secret|api[\s_-]?key)",
+        r"system\s+(prompt|alert)",
+        r"override\s+(safety\s+)?instructions",
+        r"disregard\s+(all\s+)?(limits|instructions|rules)",
+        r"revela\s+(el\s+)?(prompt|secreto|clave|token|credencial)",
+        r"reveal\s+(the\s+)?(prompt|secret|api[\s_-]?key|credentials)",
         r"forget\s+all\s+rules",
         r"olvida\s+todas\s+las\s+reglas",
         r"you\s+are\s+now\s+an\s+unrestricted",
         r"ahora\s+eres\s+un\s+modelo\s+sin\s+restricciones",
         r"act\s+as\s+dan",
         r"modo\s+desarrollador",
+        r"olv[ií]date\s+de\s+.*\s+y\s+act[uú]a\s+como",
+        r"afirma\s+(categóricamente|sin\s+pruebas).*\b(fraude|culpab|delito)",
+        r"declar[aá](ndolas|ndolos)?\s+formalmente\s+culpables?",
+        r"publica\s+inmediatamente\s+.*\s+sin\s+(pasar\s+por\s+)?revisi[oó]n",
+        r"drop\s+table|select\s+\*\s+from",
+        r"recomienda\s+comprar\s+acciones|garantizando\s+rentabilidad",
+        r"liquidity\s+insolvency|quiebra\s+bancaria",
+        r"simula\s+que|detalles\s+inventados|paywall",
     ]
 
     @classmethod
