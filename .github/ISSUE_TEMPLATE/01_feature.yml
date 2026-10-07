@@ -1,0 +1,36 @@
+name: "✨ Nueva Funcionalidad"
+description: "Proponer una nueva característica o conector para el copiloto"
+title: "feat: "
+labels: ["enhancement", "type:ai-core"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Reto HackIAthon TVN Media
+        Complete la siguiente información para describir la funcionalidad propuesta.
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción de la Funcionalidad
+      description: ¿Qué valor aporta al periodista o analista?
+      placeholder: Breve resumen de la característica...
+    validations:
+      required: true
+  - type: dropdown
+    id: modality
+    attributes:
+      label: Modalidad Aplicable
+      options:
+        - "TVN Editorial"
+        - "Sector Bancario"
+        - "Núcleo Común"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Criterios de Aceptación
+      description: ¿Cómo sabremos que la funcionalidad está completa y verificada?
+      placeholder: - Criterio 1\n- Criterio 2
+    validations:
+      required: true

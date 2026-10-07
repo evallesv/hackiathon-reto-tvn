@@ -1,0 +1,61 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "generated": 1710500000000,
+    "url": "https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson",
+    "title": "USGS Earthquakes - Panama Region Box [5, 12] [-86, -76]",
+    "status": 200,
+    "api": "1.14.0",
+    "count": 3
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 4.8,
+        "place": "72 km S of Punta de Burica, Panama",
+        "time": 1710386100000,
+        "updated": 1710387000000,
+        "status": "reviewed",
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000m1a1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-82.85, 7.42, 10.0]
+      },
+      "id": "us7000m1a1"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 3.9,
+        "place": "45 km SSW of Coiba Island, Panama",
+        "time": 1710299700000,
+        "updated": 1710300600000,
+        "status": "reviewed",
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000m1a2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-81.95, 7.15, 15.0]
+      },
+      "id": "us7000m1a2"
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mag": 3.4,
+        "place": "28 km SE of Puerto Armuelles, Panama",
+        "time": 1710213300000,
+        "updated": 1710214200000,
+        "status": "reviewed",
+        "url": "https://earthquake.usgs.gov/earthquakes/eventpage/us7000m1a3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-82.68, 8.12, 22.0]
+      },
+      "id": "us7000m1a3"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+pais_iso3,indicador_id,anio,valor,unidad,fuente_url,fecha_extraccion,licencia
+PAN,NY.GDP.MKTP.KD.ZG,2021,15.3,%,https://api.worldbank.org/v2/country/PAN/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,NY.GDP.MKTP.KD.ZG,2022,10.8,%,https://api.worldbank.org/v2/country/PAN/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,NY.GDP.MKTP.KD.ZG,2023,7.3,%,https://api.worldbank.org/v2/country/PAN/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,NY.GDP.MKTP.KD.ZG,2024,,%,https://api.worldbank.org/v2/country/PAN/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,FP.CPI.TOTL.ZG,2023,1.5,%,https://api.worldbank.org/v2/country/PAN/indicator/FP.CPI.TOTL.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,SL.UEM.TOTL.ZS,2023,7.4,%,https://api.worldbank.org/v2/country/PAN/indicator/SL.UEM.TOTL.ZS,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,SP.POP.TOTL,2023,4408581,personas,https://api.worldbank.org/v2/country/PAN/indicator/SP.POP.TOTL,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,IT.NET.USER.ZS,2023,74.5,%,https://api.worldbank.org/v2/country/PAN/indicator/IT.NET.USER.ZS,2024-03-01T00:00:00Z,CC BY 4.0
+PAN,NE.EXP.GNFS.ZS,2023,38.2,%,https://api.worldbank.org/v2/country/PAN/indicator/NE.EXP.GNFS.ZS,2024-03-01T00:00:00Z,CC BY 4.0
+CRI,NY.GDP.MKTP.KD.ZG,2023,5.1,%,https://api.worldbank.org/v2/country/CRI/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+COL,NY.GDP.MKTP.KD.ZG,2023,0.6,%,https://api.worldbank.org/v2/country/COL/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+DOM,NY.GDP.MKTP.KD.ZG,2023,2.4,%,https://api.worldbank.org/v2/country/DOM/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+MEX,NY.GDP.MKTP.KD.ZG,2023,3.2,%,https://api.worldbank.org/v2/country/MEX/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0
+GTM,NY.GDP.MKTP.KD.ZG,2023,3.5,%,https://api.worldbank.org/v2/country/GTM/indicator/NY.GDP.MKTP.KD.ZG,2024-03-01T00:00:00Z,CC BY 4.0

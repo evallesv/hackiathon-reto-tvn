@@ -1,0 +1,26 @@
+name: "🏛️ Registro de Decisión Arquitectónica (ADR)"
+description: "Proponer una nueva decisión de arquitectura técnica o de datos"
+title: "adr: Proponer ADR-000X: "
+labels: ["type:adr", "documentation"]
+body:
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto y Problema
+      description: ¿Qué problema técnico o de negocio estamos abordando?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Opciones Consideradas
+      description: Pros y contras de cada alternativa analizada.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decisión Propuesta
+      description: Qué solución adoptamos y por qué.
+    validations:
+      required: true

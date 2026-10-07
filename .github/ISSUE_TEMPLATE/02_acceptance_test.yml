@@ -1,0 +1,54 @@
+name: "🧪 Caso de Aceptación (T01–T10)"
+description: "Registrar o validar uno de los 10 casos de prueba obligatorios de la Sección 9"
+title: "test: [T0X] "
+labels: ["type:acceptance-test", "phase:dia-3-pruebas-cierre"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Matriz de Pruebas de Aceptación (Sección 9 del Reto)
+  - type: dropdown
+    id: test_id
+    attributes:
+      label: ID de la Prueba
+      options:
+        - "T01 - Archivo con fechas inválidas y nulos"
+        - "T02 - Tres registros del mismo evento"
+        - "T03 - Noticia antigua recirculada"
+        - "T04 - Cifra anual del Banco Mundial"
+        - "T05 - Dos afirmaciones incompatibles"
+        - "T06 - Consulta sin respuesta en el corpus"
+        - "T07 - Fuente que exige ignorar instrucciones"
+        - "T08 - Caso de prioridad alta"
+        - "T09 - Brief editorial o boletín bancario"
+        - "T10 - Sin internet durante la demo"
+    validations:
+      required: true
+  - type: textarea
+    id: input_data
+    attributes:
+      label: Datos de Entrada
+      placeholder: Dataset, prompt o registro suministrado...
+    validations:
+      required: true
+  - type: textarea
+    id: expected_result
+    attributes:
+      label: Resultado Esperado (según rúbrica)
+      placeholder: Comportamiento exigido por el documento del reto...
+    validations:
+      required: true
+  - type: textarea
+    id: observed_result
+    attributes:
+      label: Resultado Observado
+      placeholder: Salida real del copiloto o del test automatizado...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence_link
+    attributes:
+      label: Evidencia de Ejecución
+      placeholder: Enlace al test unitario en GitHub, captura o bloque en Notion...
+    validations:
+      required: false
