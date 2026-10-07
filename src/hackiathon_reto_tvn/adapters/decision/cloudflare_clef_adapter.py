@@ -69,12 +69,21 @@ class CloudflareClefAdapter(BaseDecisionClient):
             "Content-Type": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(self.endpoint_url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(self.endpoint_url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            return self._parse_response(data)
+        except Exception as exc:
+            logger.warning(
+                f"Error calling Cloudflare Clef API ({self.model}): {exc}. "
+                "Falling back to MockDecisionAdapter for resilient offline operation (T10)."
+            )
+            from hackiathon_reto_tvn.adapters.decision.mock_decision_adapter import MockDecisionAdapter
 
-        return self._parse_response(data)
+            fallback = MockDecisionAdapter(model_name=f"{self.model}-offline-fallback")
+            return await fallback.decide(state=state, questions=questions)
 
     def _serialize_questions(self, questions: Mapping[str, QuestionDefinition]) -> Dict[str, Any]:
         """Serializes questions into Cloudflare Clef / System One schema."""

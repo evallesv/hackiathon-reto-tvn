@@ -100,15 +100,30 @@ class OpenCodeAdapter(BaseLLMClient):
         except Exception as exc:
             # If chat.completions failed due to protocol, fallback to responses.create
             if "ModelProtocolUnsupported" in str(exc) or "protocol" in str(exc).lower():
-                resp = await self._client.responses.create(
-                    model=self._model,
-                    instructions=system_prompt,
-                    input=sanitized_prompt,
-                    extra_headers=headers,
-                )
-                return getattr(resp, "output_text", "") or ""
-            logger.error(f"Error calling OpenCode API ({self._model}): {exc}")
-            raise
+                try:
+                    resp = await self._client.responses.create(
+                        model=self._model,
+                        instructions=system_prompt,
+                        input=sanitized_prompt,
+                        extra_headers=headers,
+                    )
+                    return getattr(resp, "output_text", "") or ""
+                except Exception as inner_exc:
+                    logger.debug(f"Responses API protocol fallback failed: {inner_exc}")
+
+            logger.warning(
+                f"Error calling OpenCode API ({self._model}): {exc}. "
+                "Falling back to MockLLMAdapter for resilient offline operation (T10)."
+            )
+            from hackiathon_reto_tvn.adapters.llm.mock_adapter import MockLLMAdapter
+
+            fallback = MockLLMAdapter(model_name=f"{self._model}-offline-fallback")
+            return await fallback.generate_text(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
 
     async def generate_structured(
         self,
@@ -157,16 +172,31 @@ class OpenCodeAdapter(BaseLLMClient):
                 raw_content = response.choices[0].message.content or "{}"
             except Exception as exc:
                 if "ModelProtocolUnsupported" in str(exc) or "protocol" in str(exc).lower():
-                    resp = await self._client.responses.create(
-                        model=self._model,
-                        instructions=enriched_system,
-                        input=sanitized_prompt,
-                        extra_headers=headers,
+                    try:
+                        resp = await self._client.responses.create(
+                            model=self._model,
+                            instructions=enriched_system,
+                            input=sanitized_prompt,
+                            extra_headers=headers,
+                        )
+                        raw_content = getattr(resp, "output_text", "") or ""
+                    except Exception as inner_exc:
+                        logger.debug(f"Responses API structured fallback failed: {inner_exc}")
+
+                if not raw_content:
+                    logger.warning(
+                        f"Error producing structured response from OpenCode ({self._model}): {exc}. "
+                        "Falling back to MockLLMAdapter for resilient offline operation (T10)."
                     )
-                    raw_content = getattr(resp, "output_text", "") or ""
-                else:
-                    logger.error(f"Error producing structured response from OpenCode ({self._model}): {exc}")
-                    raise
+                    from hackiathon_reto_tvn.adapters.llm.mock_adapter import MockLLMAdapter
+
+                    fallback = MockLLMAdapter(model_name=f"{self._model}-offline-fallback")
+                    return await fallback.generate_structured(
+                        prompt=prompt,
+                        response_model=response_model,
+                        system_instruction=system_instruction,
+                        temperature=temperature,
+                    )
 
         cleaned = raw_content.strip()
         if cleaned.startswith("```json"):

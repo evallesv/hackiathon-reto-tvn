@@ -209,3 +209,26 @@ async def get_live_noticias(
     storage = SQLiteStorage(settings.SQLITE_DB_PATH)
     storage.init_db()
     return storage.get_latest_noticias(limit=limit)
+
+
+@router.get("/api/v1/copilot/benchmark/metrics", tags=["Copilot"])
+async def get_benchmark_metrics(
+    service: CopilotService = Depends(get_copilot_service),
+) -> Dict[str, Any]:
+    """Returns official evaluation benchmark metrics and comparative baseline results (Sección 8 & 9.1)."""
+    import json
+    from pathlib import Path
+
+    from hackiathon_reto_tvn.services.baseline_evaluator import BaselineEvaluator
+
+    cache_file = Path("data/benchmark_results.json")
+    if cache_file.exists():
+        try:
+            with open(cache_file, "r", encoding="utf-8") as f:
+                data: Dict[str, Any] = json.load(f)
+                return data
+        except Exception:
+            pass
+
+    evaluator = BaselineEvaluator(service=service, settings=service.settings)
+    return await evaluator.run_benchmark_suite(only_dev=True)

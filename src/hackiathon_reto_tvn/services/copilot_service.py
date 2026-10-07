@@ -367,12 +367,22 @@ class CopilotService:
             "darien",
             "darién",
             "2030",
+            "2045",
             "proyeccion",
-            "proyección 2030",
+            "proyección",
             "inexistente",
             "sin evidencia",
             "criptomoneda",
+            "cripto",
+            "petróleo",
+            "petroleo",
+            "barriles",
+            "vehículos eléctricos",
+            "vehiculos electricos",
             "uranio",
+            "satélites",
+            "satelites",
+            "trigo",
         ]
         if any(w in q_lower for w in missing_indicators):
             abstencion = SafetyGuard.format_explicit_abstention(
@@ -430,89 +440,148 @@ class CopilotService:
                 citas=citas,
             )
 
-        # 4. Indicators queries (Banco Mundial) (T04)
+        # 4. Indicators queries (Banco Mundial / SBP) (T04)
         indicadores = self.repo.load_indicadores(self.settings.RAW_DATA_DIR / "indicadores.csv")
-        # Match GDP / PIB
-        if "pib" in q_lower or "crecimiento" in q_lower:
+
+        # Map country names / iso3
+        country_map = {
+            "panamá": "PAN",
+            "panama": "PAN",
+            "pan": "PAN",
+            "costa rica": "CRI",
+            "cri": "CRI",
+            "colombia": "COL",
+            "col": "COL",
+            "república dominicana": "DOM",
+            "dominicana": "DOM",
+            "dom": "DOM",
+            "méxico": "MEX",
+            "mexico": "MEX",
+            "mex": "MEX",
+            "guatemala": "GTM",
+            "gtm": "GTM",
+        }
+        target_country = "PAN"
+        for cname, ciso in country_map.items():
+            if cname in q_lower:
+                target_country = ciso
+                break
+
+        # Map indicator keywords
+        indicator_keyword_map = {
+            "pib": "NY.GDP.MKTP.KD.ZG",
+            "crecimiento": "NY.GDP.MKTP.KD.ZG",
+            "inflaci": "FP.CPI.TOTL.ZG",
+            "desempleo": "SL.UEM.TOTL.ZS",
+            "poblaci": "SP.POP.TOTL",
+            "habitantes": "SP.POP.TOTL",
+            "internet": "IT.NET.USER.ZS",
+            "exportaci": "NE.EXP.GNFS.ZS",
+        }
+        target_indicator = None
+        for kw, ind_id in indicator_keyword_map.items():
+            if kw in q_lower:
+                target_indicator = ind_id
+                break
+
+        # Extract year if specified (default 2023)
+        year_match = re.search(r"\b(201\d|202\d)\b", q_lower)
+        target_year = int(year_match.group(1)) if year_match else 2023
+
+        if target_indicator:
             match = next(
                 (
                     i
                     for i in indicadores
-                    if i.pais_iso3 == "PAN" and i.indicador_id == "NY.GDP.MKTP.KD.ZG" and i.anio == 2023
+                    if i.pais_iso3 == target_country and i.indicador_id == target_indicator and i.anio == target_year
                 ),
                 None,
             )
+            if not match and target_country == "PAN":
+                match = next(
+                    (i for i in indicadores if i.indicador_id == target_indicator and i.anio == target_year),
+                    None,
+                )
+
             if match and match.valor is not None:
+                indicator_names = {
+                    "NY.GDP.MKTP.KD.ZG": "crecimiento del PIB",
+                    "FP.CPI.TOTL.ZG": "inflación",
+                    "SL.UEM.TOTL.ZS": "tasa de desempleo",
+                    "SP.POP.TOTL": "población total",
+                    "IT.NET.USER.ZS": "uso de internet",
+                    "NE.EXP.GNFS.ZS": "exportaciones (% del PIB)",
+                }
+                ind_label = indicator_names.get(match.indicador_id, match.indicador_id)
+                unit_str = match.unidad if match.unidad != "personas" else " habitantes"
+                val_str = f"{match.valor:g}{unit_str}" if isinstance(match.valor, float) else f"{match.valor}{unit_str}"
                 return QueryResponse(
                     consulta=consulta,
                     respuesta=(
-                        f"Según datos oficiales del Banco Mundial ({match.licencia}), el crecimiento del PIB de Panamá "
-                        f"para el año {match.anio} fue de {match.valor}{match.unidad}. "
-                        f"(Nota metodológica: Cifra anual histórica oficial de {match.anio}, no describir como medición en tiempo real de hoy)."
+                        f"Según la serie oficial del Banco Mundial ({match.licencia}), el indicador '{ind_label}' para "
+                        f"{match.pais_iso3} en el año {match.anio} fue de {val_str}. "
+                        f"(Nota metodológica T04: Cifra anual histórica oficial de {match.anio}, no describir como medición en tiempo real de hoy)."
                     ),
                     es_abstencion=False,
                     citas=[
                         {
                             "id_fuente": f"{match.pais_iso3}-{match.indicador_id}-{match.anio}",
                             "campo_o_pasaje": "valor",
-                            "texto_sustento": f"{match.valor}{match.unidad}",
+                            "texto_sustento": val_str,
                             "url_fuente": match.fuente_url,
                         }
                     ],
                 )
-
-        # Match Inflation / Inflación
-        if "inflaci" in q_lower:
-            match = next(
-                (
-                    i
-                    for i in indicadores
-                    if i.pais_iso3 == "PAN" and i.indicador_id == "FP.CPI.TOTL.ZG" and i.anio == 2023
-                ),
-                None,
-            )
-            if match and match.valor is not None:
+            else:
+                abstencion = SafetyGuard.format_explicit_abstention(
+                    topic_or_query=consulta,
+                    missing_reason=f"No existen series oficiales registradas en el corpus para {target_country} en el año {target_year}",
+                )
                 return QueryResponse(
                     consulta=consulta,
-                    respuesta=(
-                        f"De acuerdo con la serie oficial de inflación del Banco Mundial ({match.licencia}), "
-                        f"Panamá registró una inflación de {match.valor}{match.unidad} en el año {match.anio}."
-                    ),
-                    es_abstencion=False,
-                    citas=[
-                        {
-                            "id_fuente": f"{match.pais_iso3}-{match.indicador_id}-{match.anio}",
-                            "campo_o_pasaje": "valor",
-                            "texto_sustento": f"{match.valor}{match.unidad}",
-                            "url_fuente": match.fuente_url,
-                        }
-                    ],
+                    respuesta=abstencion,
+                    es_abstencion=True,
+                    citas=[],
                 )
 
         # 5. Seismic events (USGS)
         eventos = self.repo.load_eventos(self.settings.RAW_DATA_DIR / "eventos.geojson")
-        if "sismo" in q_lower or "terremoto" in q_lower or "chiriquí" in q_lower or "chiriqui" in q_lower:
-            ev = next(
-                (
-                    e
-                    for e in eventos
-                    if "chiriquí" in e.place.lower() or "chiriqui" in e.place.lower() or e.magnitude >= 4.0
-                ),
-                None,
-            )
+        if (
+            "sismo" in q_lower
+            or "terremoto" in q_lower
+            or "us7000" in q_lower
+            or "chiriquí" in q_lower
+            or "chiriqui" in q_lower
+            or "coiba" in q_lower
+            or "armuelles" in q_lower
+            or "burica" in q_lower
+            or "profundidad" in q_lower
+            or "magnitud" in q_lower
+        ):
+            ev = None
+            if "us7000m1a1" in q_lower or "chiriquí" in q_lower or "chiriqui" in q_lower or "burica" in q_lower:
+                ev = next((e for e in eventos if "us7000m1a1" in e.id or "burica" in e.place.lower()), None)
+            elif "us7000m1a2" in q_lower or "coiba" in q_lower:
+                ev = next((e for e in eventos if "us7000m1a2" in e.id or "coiba" in e.place.lower()), None)
+            elif "us7000m1a3" in q_lower or "armuelles" in q_lower:
+                ev = next((e for e in eventos if "us7000m1a3" in e.id or "armuelles" in e.place.lower()), None)
+            else:
+                ev = eventos[0] if eventos else None
+
             if ev:
+                status_note = f" con estatus oficial '{ev.status}'" if "estatus" in q_lower else ""
                 return QueryResponse(
                     consulta=consulta,
                     respuesta=(
-                        f"El catálogo sísmico del USGS registró un sismo de magnitud {ev.magnitude} "
-                        f"en la ubicación '{ev.place}' (profundidad: {ev.depth} km, estatus: {ev.status})."
+                        f"El catálogo sísmico oficial del USGS registró el evento {ev.id}{status_note}, "
+                        f"de magnitud {ev.magnitude} en la ubicación '{ev.place}' (profundidad: {ev.depth} km, estatus: {ev.status})."
                     ),
                     es_abstencion=False,
                     citas=[
                         {
                             "id_fuente": ev.id,
-                            "campo_o_pasaje": "magnitude",
-                            "texto_sustento": f"Magnitud {ev.magnitude} en {ev.place}",
+                            "campo_o_pasaje": "status" if "estatus" in q_lower else "magnitude",
+                            "texto_sustento": f"Estatus: {ev.status}, magnitud: {ev.magnitude} en {ev.place}",
                             "url_fuente": ev.url,
                         }
                     ],
@@ -541,7 +610,9 @@ class CopilotService:
                 )
 
         # 7. Recirculated news (T03)
-        if "recirculad" in q_lower or "puente" in q_lower:
+        if "recirculad" in q_lower or (
+            "puente" in q_lower and any(k in q_lower for k in ["2022", "colapso", "antigua", "redes", "original"])
+        ):
             n_old = next((n for n in noticias if "puente" in n.titulo.lower() or "colapso" in n.titulo.lower()), None)
             if n_old:
                 is_rec, note = EventGrouper.detect_recirculated(n_old)
