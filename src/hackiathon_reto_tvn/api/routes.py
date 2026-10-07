@@ -133,13 +133,89 @@ async def query_copilot(
     return await service.answer_query_async(consulta=req.consulta, modalidad=req.modalidad)
 
 
+@router.get("/api/v1/copilot/fichas", response_model=List[FichaCaso], tags=["Copilot"])
+async def get_fichas(
+    settings: Settings = Depends(get_settings),
+) -> List[FichaCaso]:
+    """Retrieves all tracked case cards (fichas) from persistent SQLite storage (CU-02)."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    fichas_raw = storage.get_all_fichas()
+    if not fichas_raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            fichas_raw = storage.get_all_fichas()
+    return [FichaCaso.model_validate(f) for f in fichas_raw]
+
+
+@router.get("/api/v1/copilot/fichas/export", tags=["Copilot"])
+async def export_fichas(
+    settings: Settings = Depends(get_settings),
+) -> List[Dict[str, Any]]:
+    """Exports all case cards as a list of dictionaries for downstream auditing."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    fichas_raw = storage.get_all_fichas()
+    if not fichas_raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            fichas_raw = storage.get_all_fichas()
+    return fichas_raw
+
+
+@router.get("/api/v1/copilot/fichas/{id_caso}", response_model=FichaCaso, tags=["Copilot"])
+async def get_ficha_by_id(
+    id_caso: str,
+    settings: Settings = Depends(get_settings),
+) -> FichaCaso:
+    """Retrieves a single case card by ID."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    raw = storage.get_ficha(id_caso)
+    if not raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            raw = storage.get_ficha(id_caso)
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ficha {id_caso} no encontrada.",
+        )
+    return FichaCaso.model_validate(raw)
+
+
 @router.post("/api/v1/copilot/review", response_model=FichaCaso, tags=["Human-in-the-loop"])
 async def update_review(
     req: ReviewUpdateRequest,
     service: CopilotService = Depends(get_copilot_service),
+    settings: Settings = Depends(get_settings),
 ) -> FichaCaso:
-    """Transitions a case through human review states."""
-    # Find case in agenda
+    """Transitions a case through human review states and persists the decision in SQLite."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+
+    existing = storage.get_ficha(req.caso_id)
+    if existing:
+        updated_dict = storage.update_review_status(
+            id_caso=req.caso_id,
+            nuevo_estado=req.nuevo_estado.value,
+            persona_revisora=req.persona_revisora,
+            observaciones=req.observaciones,
+        )
+        if updated_dict:
+            return FichaCaso.model_validate(updated_dict)
+
     agenda = await service.prioritize_agenda_async(top_n=20)
     for c in agenda:
         if c.id_caso == req.caso_id:
@@ -149,10 +225,12 @@ async def update_review(
                 persona_revisora=req.persona_revisora,
                 observaciones=req.observaciones,
             )
+            storage.upsert_ficha(updated)
             return updated
+
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Caso {req.caso_id} no encontrado en la agenda actual.",
+        detail=f"Caso {req.caso_id} no encontrado en la base de datos ni en la agenda actual.",
     )
 
 
