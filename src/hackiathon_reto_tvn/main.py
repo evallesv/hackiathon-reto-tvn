@@ -2,6 +2,7 @@
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 import uvicorn
@@ -81,6 +82,19 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(router)
+
+    ui_dir = Path(__file__).parent / "ui"
+    if ui_dir.exists():
+        from fastapi.responses import FileResponse
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/static", StaticFiles(directory=str(ui_dir)), name="static")
+
+        @app.get("/", response_class=FileResponse, include_in_schema=False)
+        @app.get("/dashboard", response_class=FileResponse, include_in_schema=False)
+        async def serve_dashboard() -> FileResponse:
+            return FileResponse(str(ui_dir / "index.html"))
+
     return app
 
 
