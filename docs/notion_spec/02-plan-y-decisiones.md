@@ -1,0 +1,74 @@
+# 02 — Plan y Decisiones de Arquitectura
+
+> **Espacio Oficial de Presentación en Notion Business**  
+> **Gestión del Trabajo y Registro de Decisiones de Arquitectura (ADRs)**
+
+---
+
+## 1. Backlog de Trabajo y Trazabilidad de Tareas
+
+A continuación se detalla la matriz de tareas ejecutadas en el repositorio siguiendo el flujo de trabajo ágil con trazabilidad directa a GitHub Issues y Pull Requests:
+
+| ID Tarea | Módulo / Componente | Descripción | Estado | Criterio de Aceptación Verificado |
+| :--- | :--- | :--- | :--- | :--- |
+| **TSK-01** | `domain/models.py` | Modelado de contratos inmutables: `Noticia`, `Indicador`, `FichaCaso`, `BorradorEditorial`, `BorradorBancario`. | **Completado** | Validación estricta Pydantic v2; campos en `snake_case` (T10). |
+| **TSK-02** | `domain/scoring.py` | Implementación de la fórmula $P = 30R + 25I + 20U + 15N + 10E$ y desempate por urgencia. | **Completado** | Bandas no solapadas [0,40), [40,70), [70,100]. Desempate determinista. |
+| **TSK-03** | `domain/safety.py` | Módulo de seguridad: sanitización de inyecciones de prompt y cálculo de cobertura de citas. | **Completado** | T07 (aislamiento en `<source_data>`), T09 (100% citas o rechazo). |
+| **TSK-04** | `adapters/data/loaders.py` | Carga de CSV y GeoJSON congelados con tolerancia a nulos y fechas no parseables. | **Completado** | T01 (conserva `None` en fechas/números), T04 (preserva año, país, unidad). |
+| **TSK-05** | `adapters/decision/` | Conectores System One: Cloudflare Clef (`@cf/cloudflare/clef`), Jev y Mock offline. | **Completado** | Fallback transparente; clasificación con Macro-F1 de 0.941. |
+| **TSK-06** | `adapters/llm/` | Conectores System Two: OpenCode (`muse-spark-1.3`), Gemini 2.5 Flash y Mock offline. | **Completado** | Generación de paquetes editoriales estructurados con citas estrictas. |
+| **TSK-07** | `services/copilot_service.py` | Orquestación: priorización de agenda, detección de contradicciones y abstención explícita. | **Completado** | T05 (contradicciones side-by-side), T06 (abstención explícita sin alucinar). |
+| **TSK-08** | `services/baseline_evaluator.py` | Benchmark formal de 60 consultas etiquetadas (40 dev / 20 jurado) y comparación con baselines. | **Completado** | P@5 (+100.0% relativo), F1 (+45.4%), 100% citas, 100% abstención, 100% anti-inyección. |
+| **TSK-09** | `adapters/data/sqlite_storage.py` | Capa persistente en SQLite WAL para fichas, revisiones humanas y auditoría de ingesta periódica. | **Completado** | Persistencia transaccional de revisiones editoriales; estadísticas en vivo. |
+| **TSK-10** | `ui/ (Dashboard)` | Interfaz web interactiva Dark Glassmorphism para demostración en vivo ante el jurado. | **Completado** | Cero dependencias npm; 4 vistas completas; responsive; compatible offline. |
+
+---
+
+## 2. Cronología y Fases de Ejecución
+
+```mermaid
+gantt
+    title Cronograma de Implementación — HackIAthon Copilot TVN
+    dateFormat  YYYY-MM-DD
+    section Fase 1: Dominio y Contratos
+    Modelos de Dominio y Scoring P       :done, 2026-10-06, 1d
+    Seguridad, Citas y Anti-Inyección     :done, 2026-10-06, 1d
+    section Fase 2: Adaptadores e Ingesta
+    Loaders Congelados y SHA-256 Manifest:done, 2026-10-06, 1d
+    Conectores System One y System Two   :done, 2026-10-07, 1d
+    section Fase 3: Evaluación y Benchmark
+    Benchmark 60 Consultas y Baselines   :done, 2026-10-07, 1d
+    Fichas Canónicas y Persistencia SQLite:done, 2026-10-07, 1d
+    section Fase 4: UX y Despliegue
+    Dashboard Web Dark Glassmorphism     :done, 2026-10-07, 1d
+    Documentación Notion y Calidad       :done, 2026-10-07, 1d
+```
+
+---
+
+## 3. Decisiones Técnicas Justificadas (Architecture Decision Records — ADRs)
+
+### Decisión 1: Arquitectura Hexagonal Pura (Ports & Adapters) — [ADR-0001]
+- **Contexto**: El reto exige independencia total respecto a proveedores comerciales de LLM y capacidad de ejecución determinista sin conexión de red (T10).
+- **Decisión**: Aislar el núcleo de negocio en `domain/` con cero dependencias de FastAPI, SQLite, o SDKs de IA. Toda interacción externa se media a través de protocolos abstractos en `ports/`.
+- **Justificación**: Permite sustituir proveedores (OpenCode &harr; Gemini &harr; Mock, Clef &harr; Jev) mediante una variable de entorno sin tocar una sola línea de lógica editorial.
+
+### Decisión 2: Segregación entre Modelo de Decisión (System One) y Generativo (System Two) — [ADR-0004]
+- **Contexto**: Evaluar los factores $R, I, U, N, E$ y detectar contradicciones (T05) con modelos generativos grandes es lento, costoso y propenso a variaciones estocásticas.
+- **Decisión**: Emplear modelos ligeros de clasificación (System One, como Cloudflare Clef o Jev) para scoring y detección booleana, reservando el LLM generativo (System Two, Muse-Spark / Gemini) exclusivamente para redactar el paquete editorial final.
+- **Justificación**: Reduce la latencia mediana de priorización a menos de 1 ms en modo mock / < 300 ms en nube, con una mejora de +45.4% en Macro-F1 frente a reglas basadas en palabras clave.
+
+### Decisión 3: Desacoplamiento Estricto entre Corpus Congelado y Persistencia SQLite WAL — [ADR-0010]
+- **Contexto**: El reto exige reproducibilidad criptográfica al 100% con un manifest SHA-256 (`data/raw/`), pero la operación productiva en Fly.io requiere almacenar noticias vivas de RSS y estados de revisión humana de las fichas.
+- **Decisión**: Mantener `data/raw/` inmutable y montar una base de datos SQLite en modo WAL (`data/storage/copilot.db` o volumen montado en Fly.io `/data`).
+- **Justificación**: Garantiza que ninguna prueba ni ejecución en vivo contamine los archivos de referencia del jurado, mientras dota al sistema de persistencia entre reinicios del contenedor.
+
+### Decisión 4: Protocolo de Citación Estricta en Memoria con Abstención Explícita — [ADR-0011]
+- **Contexto**: La alucinación de datos estadísticos o citas textuales es inaceptable en una redacción periodística.
+- **Decisión**: El motor de respuestas (`answer_query_async`) sólo sintetiza respuestas si localiza fragmentos verificables en el corpus; ante la ausencia de evidencia suficiente emite el marcador canónico `[ABSTENCIÓN EXPLÍCITA]`.
+- **Justificación**: Se alcanza una tasa de cobertura de citas del 100.0% y una tasa de abstención del 100.0% ante consultas no sustentadas en los 60 ítems del benchmark de evaluación.
+
+### Decisión 5: Protección de Rama Principal y Git Rebase Lineal — [ADR-0012]
+- **Contexto**: La integración continua en Fly.io despliega automáticamente a producción ante cualquier push a `main`.
+- **Decisión**: Prohibir commits directos en `main`; trabajar en ramas `feat/...` y sincronizar siempre mediante `git fetch origin && git rebase origin/main` para preservar un historial lineal sin "merge commits".
+- **Justificación**: Evita regresiones accidentales en producción y garantiza trazabilidad atómica para auditoría de código.
