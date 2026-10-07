@@ -61,3 +61,17 @@ def test_manifest_endpoint() -> None:
     assert "archivos" in data
     assert "fecha_corte_utc" in data
     assert "fecha_corte_UTC" not in data
+
+
+def test_ingestion_endpoints() -> None:
+    # Status endpoint
+    resp_status = client.get("/api/v1/ingestion/status")
+    assert resp_status.status_code == 200
+    status_data = resp_status.json()
+    assert "db_path" in status_data
+    assert "total_noticias" in status_data
+
+    # Noticias endpoint
+    resp_noticias = client.get("/api/v1/ingestion/noticias?limit=5")
+    assert resp_noticias.status_code == 200
+    assert isinstance(resp_noticias.json(), list)

@@ -16,6 +16,7 @@ def _hermetic_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("ENVIRONMENT", "test")
     monkeypatch.setenv("LLM_PROVIDER", "mock")
     monkeypatch.setenv("DECISION_PROVIDER", "mock")
+    monkeypatch.setenv("INGESTION_ENABLED", "false")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

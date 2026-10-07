@@ -28,6 +28,12 @@ def main() -> None:
     # Command: draft
     subparsers.add_parser("draft", help="Genera borrador editorial para el caso top 1")
 
+    # Command: ingest
+    subparsers.add_parser("ingest", help="Ejecuta ciclo de ingesta en vivo desde RSS, GDELT, Banco Mundial y USGS")
+
+    # Command: db-status
+    subparsers.add_parser("db-status", help="Muestra estadísticas de la base de datos SQLite y volumen persistente")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -82,6 +88,49 @@ def main() -> None:
             print(f"\nCopy Digital (<= 80 palabras):\n{borrador.copy_digital_80}")
 
         asyncio.run(_run_draft())
+
+    elif args.command == "ingest":
+
+        async def _run_ingest():
+            from hackiathon_reto_tvn.services.ingestion_scheduler import run_ingestion_cycle
+
+            print("=== Iniciando ciclo de ingesta en vivo ===")
+            print(f"Ruta SQLite: {settings.SQLITE_DB_PATH}")
+            report = await run_ingestion_cycle(settings)
+            print("\nResultado por fuente:")
+            for src, info in report.get("sources", {}).items():
+                status = info.get("status")
+                count = info.get("count", 0)
+                err = info.get("error", "")
+                if status == "SUCCESS":
+                    print(f"  ✓ {src}: {count} registros incorporados")
+                else:
+                    print(f"  ✗ {src}: {status} - {err}")
+            stats = report.get("db_stats", {})
+            print(
+                f"\nTotales en BD: {stats.get('total_noticias')} noticias, "
+                f"{stats.get('total_indicadores')} indicadores, "
+                f"{stats.get('total_eventos')} eventos"
+            )
+
+        asyncio.run(_run_ingest())
+
+    elif args.command == "db-status":
+        from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+        storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+        storage.init_db()
+        stats = storage.get_stats()
+        print("=== Estado de Base de Datos SQLite ===")
+        print(f"Ruta:              {stats.get('db_path')}")
+        print(f"Tamaño:            {stats.get('db_size_bytes', 0) / 1024:.1f} KB")
+        print(f"Noticias vivas:    {stats.get('total_noticias')}")
+        print(f"Indicadores vivos: {stats.get('total_indicadores')}")
+        print(f"Eventos sísmicos:  {stats.get('total_eventos')}")
+        print(f"Ciclos ejecutados: {stats.get('total_runs')}")
+        latest = stats.get("latest_run")
+        if latest:
+            print(f"Última ejecución:  {latest.get('finished_at')} ({latest.get('fuente')}: {latest.get('estado')})")
 
 
 if __name__ == "__main__":

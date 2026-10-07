@@ -47,9 +47,13 @@ RUN groupadd -g 10001 appgroup && \
 COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appgroup /app/src /app/src
 COPY --from=builder --chown=appuser:appgroup /app/README.md /app/README.md
+COPY --chown=appuser:appgroup scripts /app/scripts
 
 # Copy default frozen dataset directory
 COPY --chown=appuser:appgroup data /app/data
+
+# Pre-create /data directory for Fly.io persistent volume and SQLite database
+RUN mkdir -p /data && chown -R appuser:appgroup /data
 
 # Switch to unprivileged user
 USER appuser

@@ -138,6 +138,14 @@ celerybeat.pid
 *.aof
 *.pid
 
+# SQLite databases & storage
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/storage/
+
+
 # RabbitMQ
 mnesia/
 rabbitmq/

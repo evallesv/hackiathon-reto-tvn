@@ -18,6 +18,14 @@ primary_region = "dfw"
   OPENCODE_BASE_URL = "https://api.opencode.ai/v1"
   DECISION_PROVIDER = "cloudflare"
   CLOUDFLARE_DECISION_MODEL = "@cf/cloudflare/clef"
+  SQLITE_DB_PATH = "/data/copilot.db"
+  INGESTION_ENABLED = "true"
+  INGESTION_INTERVAL_MINUTES = "60"
+
+[mounts]
+  source = "sentria_data"
+  destination = "/data"
+  initial_size = "1gb"
 
 [http_service]
   internal_port = 8080

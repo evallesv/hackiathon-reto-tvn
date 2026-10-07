@@ -22,9 +22,41 @@ logger = logging.getLogger("hackiathon_reto_tvn")
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     logger.info(
-        f"Starting HackIAthon Copilot server | Env: {settings.ENVIRONMENT} | LLM Provider: {settings.LLM_PROVIDER}"
+        f"Starting HackIAthon Copilot server | Env: {settings.ENVIRONMENT} | "
+        f"LLM: {settings.LLM_PROVIDER} | Decision: {settings.DECISION_PROVIDER}"
     )
+
+    # Initialize SQLite database schema
+    try:
+        from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+        storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+        storage.init_db()
+        logger.info(f"SQLite database ready at {settings.SQLITE_DB_PATH}")
+    except Exception as exc:
+        logger.error(f"Failed to initialize SQLite storage: {exc}", exc_info=True)
+
+    # Start periodic live data ingestion worker if enabled
+    try:
+        from hackiathon_reto_tvn.services.ingestion_scheduler import (
+            start_background_scheduler,
+            stop_background_scheduler,
+        )
+
+        start_background_scheduler(settings)
+    except Exception as exc:
+        logger.error(f"Failed to start ingestion scheduler: {exc}", exc_info=True)
+
     yield
+
+    # Clean shutdown
+    try:
+        from hackiathon_reto_tvn.services.ingestion_scheduler import stop_background_scheduler
+
+        stop_background_scheduler()
+    except Exception as exc:
+        logger.warning(f"Error stopping ingestion scheduler: {exc}")
+
     logger.info("Shutting down HackIAthon Copilot server")
 
 

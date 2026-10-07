@@ -154,3 +154,42 @@ async def get_manifest(
         return Manifest.model_validate(data)
 
     return service.repo.generate_manifest(service.settings.DATA_DIR)
+
+
+@router.get("/api/v1/ingestion/status", tags=["Live Ingestion"])
+async def get_ingestion_status(
+    settings: Settings = Depends(get_settings),
+) -> Dict[str, Any]:
+    """Returns status and statistics of the SQLite storage and periodic ingestion."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    stats = storage.get_stats()
+    stats["ingestion_enabled"] = settings.INGESTION_ENABLED
+    stats["interval_minutes"] = settings.INGESTION_INTERVAL_MINUTES
+    return stats
+
+
+@router.post("/api/v1/ingestion/trigger", tags=["Live Ingestion"])
+async def trigger_ingestion(
+    settings: Settings = Depends(get_settings),
+) -> Dict[str, Any]:
+    """Manually triggers an on-demand live data ingestion cycle."""
+    from hackiathon_reto_tvn.services.ingestion_scheduler import run_ingestion_cycle
+
+    result = await run_ingestion_cycle(settings)
+    return result
+
+
+@router.get("/api/v1/ingestion/noticias", tags=["Live Ingestion"])
+async def get_live_noticias(
+    limit: int = Query(default=20, ge=1, le=100),
+    settings: Settings = Depends(get_settings),
+) -> List[Dict[str, Any]]:
+    """Returns the latest live news records stored in SQLite."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    return storage.get_latest_noticias(limit=limit)

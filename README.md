@@ -71,7 +71,7 @@ hackiathon-reto-tvn/
 │   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson
 │   ├── benchmark.jsonl              # 60 consultas de evaluación
 │   └── manifest.json                # Manifiesto criptográfico con hashes SHA-256
-├── scripts/                         # Automatización (gh_setup_tasks.py)
+├── scripts/                         # Automatización e ingesta periódica (periodic_ingestion.py)
 ├── tests/                           # Suite pytest (scoring, decision, llm, safety, T01-T10)
 ├── Dockerfile                       # Multi-stage optimizado con uv
 ├── fly.toml                         # Especificación para contenedores en nube
@@ -134,6 +134,11 @@ OPENCODE_MODEL=muse-spark-1.3-contributor-free
 # Google Gemini (Alternativo)
 GEMINI_API_KEY=tu_clave_gemini
 GEMINI_MODEL=gemini-2.5-flash
+
+# --- Almacenamiento Persistente SQLite e Ingesta Periódica (Fly.io / Local) ---
+SQLITE_DB_PATH=data/storage/copilot.db
+INGESTION_ENABLED=true
+INGESTION_INTERVAL_MINUTES=60
 ```
 
 > **Resiliencia Determinista**: Si no se configuran tokens para Cloudflare o LLMs externos, el sistema activa de forma transparente el adaptador `mock` offline, garantizando el cumplimiento estricto de la prueba de contingencia **T10** ("Sin internet durante la demo").
@@ -144,7 +149,7 @@ GEMINI_MODEL=gemini-2.5-flash
 
 ### Comandos del CLI
 ```bash
-# Consultar el estado del sistema y conector activo
+# Consultar el estado del sistema y conectores activos
 uv run hackiathon-tvn status
 
 # Calcular agenda priorizada (Top 5)
@@ -155,6 +160,12 @@ uv run hackiathon-tvn manifest
 
 # Generar borrador editorial para el caso prioritario
 uv run hackiathon-tvn draft
+
+# Ejecutar ciclo de ingesta en vivo (TVN RSS, GDELT, Banco Mundial, USGS)
+uv run hackiathon-tvn ingest
+
+# Consultar estadísticas de la base de datos SQLite y volumen persistente
+uv run hackiathon-tvn db-status
 ```
 
 ### Levantar Servidor Local
@@ -169,6 +180,9 @@ Endpoints principales:
 * `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion con citas verificadas.
 * `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).
 * `POST /api/v1/copilot/review` — Máquina de estados de revisión humana (`en_revision`, `aprobado_como_borrador`, etc.).
+* `GET /api/v1/ingestion/status` — Estadísticas de almacenamiento SQLite y auditoría de ingesta.
+* `POST /api/v1/ingestion/trigger` — Disparo manual de ciclo de ingesta en vivo.
+* `GET /api/v1/ingestion/noticias?limit=20` — Consulta de noticias vivas persistidas en SQLite.
 
 ---
 
@@ -207,8 +221,8 @@ gh issue list
 # Ver detalle de una prueba de aceptación
 gh issue view 9
 
-# Configurar o regenerar etiquetas y milestones
-uv run python scripts/gh_setup_tasks.py
+# Actualizar o cerrar una tarea completada
+gh issue close 9
 ```
 
 ---

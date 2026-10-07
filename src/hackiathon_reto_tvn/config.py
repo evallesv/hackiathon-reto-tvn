@@ -87,6 +87,22 @@ class Settings(BaseSettings):
     BENCHMARK_PATH: Path = Path("data/benchmark.jsonl")
     MANIFEST_PATH: Path = Path("data/manifest.json")
 
+    # Storage & SQLite Database
+    SQLITE_DB_PATH: Path = Field(
+        default=Path("data/storage/copilot.db"),
+        description="Path to SQLite database (on Fly.io: /data/copilot.db)",
+    )
+
+    # Periodic Ingestion Settings
+    INGESTION_ENABLED: bool = Field(
+        default=True,
+        description="Habilitar ingesta periódica de datos de fuentes vivas",
+    )
+    INGESTION_INTERVAL_MINUTES: int = Field(
+        default=60,
+        description="Intervalo en minutos para la ingesta periódica en segundo plano",
+    )
+
     # Notion Integration
     NOTION_API_KEY: str = ""
     NOTION_DATABASE_ID: str = ""
