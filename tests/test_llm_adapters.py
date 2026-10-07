@@ -36,11 +36,11 @@ async def test_mock_adapter_generate_structured_borrador() -> None:
 def test_opencode_adapter_initialization() -> None:
     adapter = OpenCodeAdapter(
         api_key="test-key",
-        base_url="https://api.opencode.ai/v1",
-        model="muse-spark-1.3-contributor-free",
+        base_url="https://opencode.ai/zen/go/v1",
+        model="muse-spark-1.3-contributor",
     )
     assert adapter.provider_name == "opencode"
-    assert adapter.model_name == "muse-spark-1.3-contributor-free"
+    assert adapter.model_name == "muse-spark-1.3-contributor"
 
 
 def test_gemini_adapter_initialization() -> None:
@@ -53,10 +53,10 @@ def test_gemini_adapter_initialization() -> None:
 
 
 def test_factory_selection_via_settings() -> None:
-    cfg_opencode = Settings(LLM_PROVIDER="opencode")
+    cfg_opencode = Settings(LLM_PROVIDER="opencode", OPENCODE_MODEL="muse-spark-1.3-contributor")
     client_opencode = get_llm_client(cfg_opencode)
     assert isinstance(client_opencode, OpenCodeAdapter)
-    assert client_opencode.model_name == "muse-spark-1.3-contributor-free"
+    assert client_opencode.model_name == "muse-spark-1.3-contributor"
 
     cfg_gemini = Settings(LLM_PROVIDER="gemini")
     client_gemini = get_llm_client(cfg_gemini)
@@ -66,3 +66,38 @@ def test_factory_selection_via_settings() -> None:
     cfg_mock = Settings(LLM_PROVIDER="mock")
     client_mock = get_llm_client(cfg_mock)
     assert isinstance(client_mock, MockLLMAdapter)
+
+
+@pytest.mark.asyncio
+async def test_opencode_adapter_generate_text_responses_api() -> None:
+    from unittest.mock import AsyncMock, MagicMock
+
+    adapter = OpenCodeAdapter(api_key="test-key", model="muse-spark-1.3-contributor")
+    mock_resp = MagicMock()
+    mock_resp.output_text = "Texto editorial generado por OpenCode"
+
+    adapter._client.responses.create = AsyncMock(return_value=mock_resp)
+
+    res = await adapter.generate_text("Prompt de prueba")
+    assert res == "Texto editorial generado por OpenCode"
+    adapter._client.responses.create.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_opencode_adapter_generate_structured_responses_api() -> None:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from pydantic import BaseModel
+
+    class DummyModel(BaseModel):
+        campo: str
+
+    adapter = OpenCodeAdapter(api_key="test-key", model="muse-spark-1.3-contributor")
+    mock_resp = MagicMock()
+    mock_resp.output_text = '{"campo": "valor_generado"}'
+
+    adapter._client.responses.create = AsyncMock(return_value=mock_resp)
+
+    obj = await adapter.generate_structured("Prompt estructurado", DummyModel)
+    assert obj.campo == "valor_generado"
+    adapter._client.responses.create.assert_awaited_once()
