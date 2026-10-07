@@ -18,8 +18,8 @@ El usuario especificó el requisito: *"Gestion de tareas y trabajo por medio de 
    * `01_feature.yml`: Para nuevas funcionalidades del copiloto y conectores.
    * `02_acceptance_test.yml`: Especializada para los 10 casos del reto (`T01`–`T10`), con campos para entrada, resultado esperado, resultado observado y evidencia.
    * `03_adr.yml`: Para registrar propuestas de decisiones de arquitectura.
-3. **Script de Inicialización Automatizada (`scripts/gh_setup_tasks.py` - Retirado tras inicialización)**:
-   * Script interactivo que utilizó `gh` para crear los Milestones del evento (Día 1, Día 2, Día 3), las etiquetas del proyecto y pre-crear los issues de las 10 pruebas T01–T10 y las 8 tareas base de la rúbrica, permitiendo posterior gestión manual y autónoma.
+3. **Script de Inicialización Automatizada (`scripts/gh_setup_tasks.py`)**:
+   * Script interactivo/automatizado que utiliza `gh` para crear los Milestones del evento (Día 1, Día 2, Día 3), las etiquetas del proyecto y pre-crear los issues de las 10 pruebas T01–T10 y las 8 tareas base de la rúbrica.
 
 ## Consecuencias
 
