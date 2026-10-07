@@ -254,6 +254,7 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0008: Contrato de Datos, Ingesta No Bloqueante y Manifiesto Criptográfico SHA-256](docs/adr/0008-data-contract-reproducibility-and-manifest.md)
 * [ADR-0009: Convención de Nombres `snake_case` para Contratos de Datos y API](docs/adr/0009-snake-case-naming-convention-for-data-contracts.md)
 * [ADR-0010: Modelos de Decisión System One (Cloudflare Clef y TypeSafe Jev) para Clasificación y Scoring](docs/adr/0010-system-one-decision-models-cloudflare-clef-and-jev.md)
+* [ADR-0011: Almacenamiento Persistente SQLite en Fly.io Volumes e Ingesta Periódica de Fuentes Vivas](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)
 
 ---
 
