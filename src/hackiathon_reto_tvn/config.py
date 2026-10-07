@@ -33,13 +33,13 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["opencode", "gemini", "mock"] = "opencode"
 
     # Decision Model Provider Selection (System One Classification)
-    DECISION_PROVIDER: Literal["cloudflare", "jev", "mock"] = "cloudflare"
+    DECISION_PROVIDER: Literal["cloudflare", "jev", "mock"] = "jev"
     DECISION_CONCURRENCY_LIMIT: int = Field(
         default=5,
         description="Límite máximo de peticiones concurrentes al modelo de decisión",
     )
 
-    # Cloudflare Clef Settings (Default Decision Model)
+    # Cloudflare Clef Settings (Alternative Decision Model)
     CLOUDFLARE_ACCOUNT_ID: str = Field(default="", description="Cloudflare Account ID")
     CLOUDFLARE_API_TOKEN: str = Field(default="", description="API Token para Cloudflare Workers AI")
     CLOUDFLARE_DECISION_MODEL: str = Field(
@@ -48,27 +48,29 @@ class Settings(BaseSettings):
     )
     CLOUDFLARE_TIMEOUT_SECONDS: float = 30.0
 
-    # TypeSafe Jev Settings (Alternative Commercial Decision Model)
-    TYPESAFE_API_KEY: str = Field(default="", description="API Key para TypeSafe Jev API")
+    # TypeSafe Jev Settings (Unified System One via OpenCode Zen or TypeSafe)
+    TYPESAFE_API_KEY: str = Field(
+        default="", description="API Key para TypeSafe Jev (opcional si OPENCODE_API_KEY está configurada)"
+    )
     TYPESAFE_BASE_URL: str = Field(
-        default="https://api.typesafe.ai/v1/systemone",
-        description="Endpoint base de TypeSafe Jev System One",
+        default="https://opencode.ai/zen/v1/systemone",
+        description="Endpoint base de TypeSafe Jev System One (vía OpenCode Zen o TypeSafe)",
     )
     TYPESAFE_MODEL: str = Field(
-        default="jev-latest",
-        description="Identificador del modelo Jev",
+        default="jev-1.13-free",
+        description="Identificador del modelo Jev (ej. jev-1.13-free en OpenCode Zen)",
     )
     TYPESAFE_TIMEOUT_SECONDS: float = 30.0
 
-    # OpenCode Settings (Default Provider)
+    # OpenCode Settings (Default Provider via OpenCode Go)
     OPENCODE_API_KEY: str = Field(default="", description="API Key for OpenCode")
     OPENCODE_BASE_URL: str = Field(
-        default="https://api.opencode.ai/v1",
-        description="Base URL for OpenCode OpenAI-compatible API",
+        default="https://opencode.ai/zen/go/v1",
+        description="Base URL for OpenCode Go API",
     )
     OPENCODE_MODEL: str = Field(
-        default="muse-spark-1.3-contributor-free",
-        description="Default OpenCode model per hackathon requirement",
+        default="muse-spark-1.3-contributor",
+        description="Default OpenCode model in Go",
     )
     OPENCODE_TIMEOUT_SECONDS: float = 45.0
 

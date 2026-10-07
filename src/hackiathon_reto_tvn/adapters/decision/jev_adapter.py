@@ -30,8 +30,8 @@ class JevAdapter(BaseDecisionClient):
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.typesafe.ai/v1/systemone",
-        model: str = "jev-latest",
+        base_url: str = "https://opencode.ai/zen/v1/systemone",
+        model: str = "jev-1.13-free",
         timeout: float = 30.0,
     ) -> None:
         self.api_key = api_key
@@ -89,18 +89,28 @@ class JevAdapter(BaseDecisionClient):
                     "type": "choice",
                     "instructions": q_def.instructions,
                 }
-                if q_def.options:
-                    entry["options"] = q_def.options
                 if q_def.criteria:
                     entry["criteria"] = q_def.criteria
+                elif q_def.options:
+                    # Jev requires criteria as a mapping of option keys to criteria descriptions
+                    entry["criteria"] = {opt: f"Opción o categoría {opt}" for opt in q_def.options}
                 serialized[q_id] = entry
             elif isinstance(q_def, ScoreQuestion):
                 entry = {
                     "type": "score",
                     "instructions": q_def.instructions,
                 }
-                if q_def.criteria:
+                if q_def.criteria and isinstance(q_def.criteria, list):
                     entry["criteria"] = q_def.criteria
+                elif q_def.criteria and isinstance(q_def.criteria, dict):
+                    entry["criteria"] = list(q_def.criteria.values())
+                else:
+                    # Jev requires criteria to be an ordered rubric list of 2 to 10 descriptions
+                    entry["criteria"] = [
+                        "Nivel bajo (mínima relevancia o impacto)",
+                        "Nivel medio (relevancia o impacto moderado)",
+                        "Nivel alto (alta prioridad, urgencia o impacto nacional)",
+                    ]
                 serialized[q_id] = entry
             else:
                 serialized[q_id] = q_def.model_dump()
@@ -115,19 +125,33 @@ class JevAdapter(BaseDecisionClient):
             if not isinstance(ans_data, dict):
                 continue
 
-            if "expected_score" in ans_data:
+            if "expected_score" in ans_data or "score" in ans_data:
+                score_val = ans_data.get("score") if "score" in ans_data else ans_data.get("expected_score")
+                raw_score = float(score_val if score_val is not None else 0.0)
+                legend = ans_data.get("legend", {})
+                if isinstance(legend, dict) and len(legend) > 1:
+                    max_idx = float(len(legend) - 1)
+                    normalized_score = min(1.0, max(0.0, raw_score / max_idx))
+                else:
+                    normalized_score = min(1.0, max(0.0, raw_score))
+
                 parsed_answers[key] = ScoreAnswer(
-                    expected_score=float(ans_data.get("expected_score", 0.0)),
+                    expected_score=normalized_score,
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},
                 )
-            elif "confidence" in ans_data or ("probabilities" in ans_data and "probability" not in ans_data):
+            elif (
+                "choice" in ans_data
+                or "confidence" in ans_data
+                or ("probabilities" in ans_data and "probability" not in ans_data and "noul" not in ans_data)
+            ):
                 parsed_answers[key] = ChoiceAnswer(
-                    answer=str(ans_data.get("answer", "")),
+                    answer=str(ans_data.get("choice") or ans_data.get("answer", "")),
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},
                     confidence=float(ans_data.get("confidence", 0.0)),
                 )
-            elif "probability" in ans_data:
-                prob = float(ans_data.get("probability", 0.0))
+            elif "noul" in ans_data or "probability" in ans_data:
+                noul_val = ans_data.get("noul") if "noul" in ans_data else ans_data.get("probability")
+                prob = float(noul_val if noul_val is not None else 0.0)
                 raw_val = ans_data.get("answer")
                 bool_val = (raw_val is True or raw_val == "yes") if raw_val is not None else (prob >= 0.5)
                 parsed_answers[key] = NoulAnswer(

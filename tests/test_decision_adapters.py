@@ -160,6 +160,47 @@ async def test_jev_adapter_parsing_and_serialization() -> None:
         assert res.get_score("calificacion") == 0.85
 
 
+@pytest.mark.asyncio
+async def test_jev_adapter_opencode_zen_format() -> None:
+    """JevAdapter parses OpenCode Zen formatted response (noul, choice, score with legend)."""
+    adapter = JevAdapter(api_key="oc_test_key", model="jev-1.13-free")
+    mock_zen_data = {
+        "model": "jev-1.13-free",
+        "answers": {
+            "relevancia": {"type": "noul", "noul": 0.92},
+            "categoria": {
+                "type": "choice",
+                "choice": "economia",
+                "confidence": 1.0,
+                "probabilities": {"economia": 1.0, "politica": 0.0},
+            },
+            "severidad": {
+                "type": "score",
+                "score": 2.0,
+                "legend": {"0": "baja", "1": "media", "2": "alta"},
+            },
+        },
+    }
+    with patch("httpx.AsyncClient.post") as mock_post:
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_zen_data
+        mock_response.raise_for_status.return_value = None
+        mock_post.return_value = mock_response
+
+        res = await adapter.decide(
+            state="Noticia de prueba",
+            questions={
+                "relevancia": NoulQuestion(instructions="Relevante"),
+                "categoria": ChoiceQuestion(instructions="Categoría"),
+                "severidad": ScoreQuestion(instructions="Severidad"),
+            },
+        )
+        assert res.get_noul("relevancia") == 0.92
+        assert res.get_choice("categoria") == "economia"
+        # 2.0 / (3 - 1) = 1.0 normalized
+        assert res.get_score("severidad") == 1.0
+
+
 def test_factory_transparent_fallback_and_selection() -> None:
     """Factory returns Cloudflare/Jev when configured, and falls back to Mock when credentials are empty."""
     # 1. Cloudflare with credentials
@@ -180,7 +221,7 @@ def test_factory_transparent_fallback_and_selection() -> None:
     client2 = get_decision_client(s2)
     assert isinstance(client2, MockDecisionAdapter)
 
-    # 3. Jev with credentials
+    # 3. Jev with Typesafe credentials
     s3 = Settings(
         DECISION_PROVIDER="jev",
         TYPESAFE_API_KEY="key123",
@@ -188,10 +229,21 @@ def test_factory_transparent_fallback_and_selection() -> None:
     client3 = get_decision_client(s3)
     assert isinstance(client3, JevAdapter)
 
+    # 3b. Jev with OpenCode credentials (unified key)
+    s3b = Settings(
+        DECISION_PROVIDER="jev",
+        TYPESAFE_API_KEY="",
+        OPENCODE_API_KEY="oc_unified_key",
+    )
+    client3b = get_decision_client(s3b)
+    assert isinstance(client3b, JevAdapter)
+    assert client3b.api_key == "oc_unified_key"
+
     # 4. Jev missing credentials -> Transparent fallback to Mock
     s4 = Settings(
         DECISION_PROVIDER="jev",
         TYPESAFE_API_KEY="",
+        OPENCODE_API_KEY="",
     )
     client4 = get_decision_client(s4)
     assert isinstance(client4, MockDecisionAdapter)

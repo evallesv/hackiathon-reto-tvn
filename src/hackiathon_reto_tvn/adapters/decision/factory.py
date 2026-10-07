@@ -42,16 +42,19 @@ def get_decision_client(settings: Optional[Settings] = None) -> BaseDecisionClie
             return MockDecisionAdapter(model_name=f"mock-{cfg.CLOUDFLARE_DECISION_MODEL.split('/')[-1]}-offline")
 
     elif cfg.DECISION_PROVIDER == "jev":
-        if cfg.TYPESAFE_API_KEY:
+        jev_key = cfg.TYPESAFE_API_KEY or cfg.OPENCODE_API_KEY
+        if jev_key:
             logger.info(f"Using TypeSafe Jev decision client with model '{cfg.TYPESAFE_MODEL}'")
             return JevAdapter(
-                api_key=cfg.TYPESAFE_API_KEY,
+                api_key=jev_key,
                 base_url=cfg.TYPESAFE_BASE_URL,
                 model=cfg.TYPESAFE_MODEL,
                 timeout=cfg.TYPESAFE_TIMEOUT_SECONDS,
             )
         else:
-            logger.info("TypeSafe Jev credentials not configured; using transparent fallback to MockDecisionAdapter.")
+            logger.info(
+                "TypeSafe/OpenCode credentials not configured; using transparent fallback to MockDecisionAdapter."
+            )
             return MockDecisionAdapter(model_name=f"mock-{cfg.TYPESAFE_MODEL}-offline")
 
     elif cfg.DECISION_PROVIDER == "mock":
