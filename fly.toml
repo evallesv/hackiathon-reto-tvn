@@ -1,47 +1,48 @@
-# ==============================================================================
-# Fly.io Machines configuration
-# Specification: https://fly.io/agent-ready.md
-# ==============================================================================
+# fly.toml app configuration file generated for sentria-tvn on 2026-10-06T23:45:10-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "sentria-tvn"
-primary_region = "dfw"
+app = 'sentria-tvn'
+primary_region = 'dfw'
+swap_size_mb = 128
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "8080"
-  HOST = "0.0.0.0"
-  ENVIRONMENT = "production"
-  LLM_PROVIDER = "opencode"
-  OPENCODE_MODEL = "muse-spark-1.3-contributor-free"
-  OPENCODE_BASE_URL = "https://api.opencode.ai/v1"
-  DECISION_PROVIDER = "cloudflare"
-  CLOUDFLARE_DECISION_MODEL = "@cf/cloudflare/clef"
-  SQLITE_DB_PATH = "/data/copilot.db"
-  INGESTION_ENABLED = "true"
-  INGESTION_INTERVAL_MINUTES = "60"
+  CLOUDFLARE_DECISION_MODEL = '@cf/cloudflare/clef'
+  DECISION_PROVIDER = 'cloudflare'
+  ENVIRONMENT = 'production'
+  HOST = '0.0.0.0'
+  INGESTION_ENABLED = 'true'
+  INGESTION_INTERVAL_MINUTES = '60'
+  LLM_PROVIDER = 'opencode'
+  OPENCODE_BASE_URL = 'https://api.opencode.ai/v1'
+  OPENCODE_MODEL = 'muse-spark-1.3-contributor-free'
+  PORT = '8080'
+  SQLITE_DB_PATH = '/data/copilot.db'
 
-[mounts]
-  source = "sentria_data"
-  destination = "/data"
-  initial_size = "1gb"
+[[mounts]]
+  source = 'sentria_data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ['app']
 
   [[http_service.checks]]
-    interval = "15s"
-    timeout = "2s"
-    grace_period = "5s"
-    method = "get"
-    path = "/healthz"
+    interval = '15s'
+    timeout = '2s'
+    grace_period = '5s'
+    method = 'get'
+    path = '/healthz'
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "1gb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
