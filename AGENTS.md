@@ -69,16 +69,17 @@ uv run pytest tests/test_acceptance_t01_t10.py  # Run the 10 mandatory acceptanc
 
 # Application Execution
 uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
-uv run hackiathon-tvn status         # Inspect copilot status and active LLM
+uv run hackiathon-tvn status         # Inspect copilot status, active Decision model, and LLM provider
 uv run hackiathon-tvn agenda --top 5 # Run prioritization ranking via CLI
 uv run hackiathon-tvn manifest       # Recalculate SHA-256 data manifest
 
-# GitHub Tasks & Issue Management (via gh CLI)
+# GitHub Tasks & CI/CD Management (via gh CLI)
 gh issue list                        # View open issues and acceptance test status
 gh issue view <ISSUE_ID>             # View task details
-gh issue close <ISSUE_ID>            # Close completed issue
+gh workflow run fly-deploy.yml       # Trigger deployment workflow manually
 
-# Fly.io Deployment & Ops
+# Deployment & Ops (Automated via GitHub Actions; local ops via flyctl)
+# Reference: [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io)
 fly status                           # Inspect Fly Machines status
 fly logs                             # Stream remote server logs
 fly secrets set KEY=VALUE            # Inject remote runtime secrets
@@ -98,18 +99,24 @@ hackiathon-reto-tvn/
 │   │   ├── scoring.py        # P = 30R + 25I + 20U + 15N + 10E & tie-breaking
 │   │   └── safety.py         # Anti-injection shield, citation coverage validator
 │   ├── ports/                # INTERFACES / ABSTRACT BASE CLASSES
-│   │   ├── llm_port.py       # BaseLLMClient protocol
+│   │   ├── decision_port.py  # BaseDecisionClient protocol (System One)
+│   │   ├── llm_port.py       # BaseLLMClient protocol (System Two)
 │   │   └── storage_port.py   # BaseStorageRepository protocol
 │   ├── adapters/             # INFRASTRUCTURE IMPLEMENTATIONS
-│   │   ├── llm/
-│   │   │   ├── opencode_adapter.py # Default provider: muse-spark-1.3-contributor-free
-│   │   │   ├── gemini_adapter.py   # Alternative provider: google-genai SDK
-│   │   │   ├── mock_adapter.py     # Deterministic offline provider (T10 & CI)
-│   │   │   └── factory.py          # Provider factory (get_llm_client)
+│   │   ├── decision/         # System One decision & classification
+│   │   │   ├── cloudflare_clef_adapter.py # @cf/cloudflare/clef via Workers AI
+│   │   │   ├── jev_adapter.py             # TypeSafe Jev connector
+│   │   │   ├── mock_decision_adapter.py   # Deterministic offline provider (T10 & CI)
+│   │   │   └── factory.py                 # Provider factory (get_decision_client)
+│   │   ├── llm/              # System Two text generation
+│   │   │   ├── opencode_adapter.py        # Default provider: muse-spark-1.3-contributor-free
+│   │   │   ├── gemini_adapter.py          # Alternative provider: google-genai SDK
+│   │   │   ├── mock_adapter.py            # Deterministic offline provider (T10 & CI)
+│   │   │   └── factory.py                 # Provider factory (get_llm_client)
 │   │   └── data/
 │   │       └── loaders.py    # Non-blocking CSV, GeoJSON & SHA-256 manifest
 │   ├── services/             # ORCHESTRATION & USE CASES
-│   │   └── copilot_service.py# Prioritization, editorial package generation, review
+│   │   └── copilot_service.py# Prioritization, editorial package generation, review, contradictions
 │   ├── api/                  # FASTAPI WEB LAYER
 │   │   └── routes.py         # /healthz, /api/v1/copilot/* endpoints
 │   ├── cli.py                # Command line interface (hackiathon-tvn)
@@ -119,17 +126,17 @@ hackiathon-reto-tvn/
 │   ├── manifest.json         # Cryptographic SHA-256 manifest
 │   └── benchmark.jsonl       # 60 benchmark evaluation queries
 ├── docs/
-│   ├── adr/                  # Architecture Decision Records (ADR-0001 to ADR-0009)
+│   ├── adr/                  # Architecture Decision Records (ADR-0001 to ADR-0010)
 │   └── ARCHITECTURE.md       # C4 diagrams and sequence flows
 ├── tests/                    # Pytest test suite (100% passing required)
 ├── Dockerfile                # Multi-stage production container with uv
-└── fly.toml                  # Fly Machines deployment spec (internal_port 8080)
+└── fly.toml                  # Cloud container deployment spec (internal_port 8080)
 ```
 
 ### Boundary Rules
 1. **`domain/`** code must NEVER import from `adapters/`, `api/`, or `services/`.
-2. **`ports/`** define abstract protocols only; no concrete external SDK calls.
-3. **`adapters/llm/`** contains all LLM vendor logic. Swapping models must NOT change `services/` or `domain/`.
+2. **`ports/`** define abstract protocols only (`BaseDecisionClient`, `BaseLLMClient`, `BaseStorageRepository`); no concrete external SDK calls.
+3. **`adapters/decision/`** and **`adapters/llm/`** contain all vendor logic. Swapping models must NOT change `services/` or `domain/`.
 4. **`api/`** only parses HTTP requests and delegates immediately to `services/copilot_service.py`.
 
 ---
@@ -155,10 +162,21 @@ $$P = 30R + 25I + 20U + 15N + 10E$$
 
 ---
 
-## 6. Interchangeable LLM Connectors
+## 6. Interchangeable Model Connectors
 
-Switching between models is controlled via `LLM_PROVIDER` in `Settings` (`.env` or system environment):
+The system segregates **System One** non-generative decision models from **System Two** generative LLMs via environment variables in `Settings`:
 
+### 6.1. System One Decision Models (`DECISION_PROVIDER`)
+| Provider Key | Adapter Class | Default Model | Configuration Keys |
+| :--- | :--- | :--- | :--- |
+| **`cloudflare`** *(Default)* | `CloudflareClefAdapter` | `@cf/cloudflare/clef` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DECISION_MODEL` |
+| **`jev`** *(Alternative)* | `JevAdapter` | `jev-latest` | `TYPESAFE_API_KEY`, `TYPESAFE_BASE_URL` |
+| **`mock`** *(Deterministic/CI)* | `MockDecisionAdapter` | `mock-decision-offline` | None (Offline, deterministic) |
+
+* Concurrency limit controlled by `DECISION_CONCURRENCY_LIMIT` (default 5 concurrent requests) using `asyncio.Semaphore`.
+* Transparent fallback to `MockDecisionAdapter` if tokens are absent, maintaining offline reproducibility.
+
+### 6.2. System Two Generative LLMs (`LLM_PROVIDER`)
 | Provider Key | Adapter Class | Default Model | Configuration Keys |
 | :--- | :--- | :--- | :--- |
 | **`opencode`** *(Default)* | `OpenCodeAdapter` | `muse-spark-1.3-contributor-free` | `OPENCODE_API_KEY`, `OPENCODE_BASE_URL` |
@@ -175,7 +193,7 @@ All code modifications must ensure that `tests/test_acceptance_t01_t10.py` passe
 - **T02**: Multiple articles for same event grouped into single provenance.
 - **T03**: Recirculated old news retains original publication date.
 - **T04**: Historical World Bank indicators retain exact year, country, and unit.
-- **T05**: Conflicting statements exposed side-by-side with verification pending. *(Not yet implemented in code; see Section 9.)*
+- **T05**: Conflicting statements exposed side-by-side with verification pending (via `detect_contradictions`).
 - **T06**: Query with no corpus evidence produces explicit abstention without hallucinating.
 - **T07**: Prompt injection attempts inside sources are neutralized and flagged as untrusted data.
 - **T08**: High priority with insufficient evidence flags an alert and blocks draft publication.
@@ -206,8 +224,8 @@ These are verified limitations of the current code. Do not assume the behaviour 
 
 | Area | Reality today | Where |
 | :--- | :--- | :--- |
-| **T05 (conflicts)** | No contradiction detector exists; the T05 test only asserts a hand-built dict. Implement real detection before claiming T05. | `tests/test_acceptance_t01_t10.py` |
-| **Scoring inputs** | R/I/U/N/E are hardcoded heuristics (e.g. the keyword `panamá`, fixed `tema` lists) inside the service, not the domain. Weights are official; the *inputs* are placeholders. | `services/copilot_service.py::prioritize_agenda` |
+| **T05 (conflicts)** | Contradiction detector implemented via BaseDecisionClient in CopilotService.detect_contradictions. | `services/copilot_service.py`, `tests/test_acceptance_t01_t10.py` |
+| **Scoring inputs** | Evaluated via System One decision models (Clef/Jev) with fallback to regex heuristics. | `services/copilot_service.py::prioritize_agenda_async` |
 | **Draft limits** | 250/80 words and 45–60 s script are config values only; nothing validates a generated draft against them. | `config.py`, `BorradorEditorial` |
 | **Draft trust boundary** | `POST /generate-draft` accepts a client-supplied `FichaCaso` (including `estado_evidencia`), so a client can self-declare sufficient evidence. Resolve the case server-side by `id_caso`. | `api/routes.py` |
 | **Review persistence** | `POST /review` recomputes the agenda and mutates a transient object; nothing is persisted. | `api/routes.py`, `CopilotService.update_human_review` |
@@ -218,7 +236,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | **Mock provider** | Returns a fixed draft but cites the first `<source_data id=...>` found in the prompt, so strict citation checks work offline. | `adapters/llm/mock_adapter.py` |
 
 ### Operational gotchas
-- **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` via an autouse fixture in `tests/conftest.py`: keep it.
+- **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.
 - **`data/manifest.json` is frozen.** Only the deliberate command `uv run hackiathon-tvn manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
 - **Recirculation (T03)** compares calendar dates with a threshold (`EventGrouper.RECIRCULATION_THRESHOLD_DAYS`), never raw timestamp strings.
 - **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, a draft with <100% citation coverage raises `ValueError` (HTTP 400).
@@ -233,6 +251,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | `domain/scoring.py` | `tests/test_scoring.py` |
 | `domain/safety.py`, prompt isolation | `tests/test_safety.py`, `tests/test_domain_invariants.py` |
 | `adapters/data/loaders.py` | `tests/test_data_loaders.py` (+ T01–T04 in acceptance file) |
+| `adapters/decision/*` | `tests/test_decision_adapters.py` (always offline/mock in tests) |
 | `adapters/llm/*` | `tests/test_llm_adapters.py` (always offline; never call real providers in tests) |
 | `services/copilot_service.py` | `tests/test_domain_invariants.py` |
 | `api/routes.py` | `tests/test_api.py` |

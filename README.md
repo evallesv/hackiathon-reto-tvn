@@ -3,9 +3,11 @@
 [![CI](https://github.com/evallesv/hackiathon-reto-tvn/actions/workflows/ci.yml/badge.svg)](https://github.com/evallesv/hackiathon-reto-tvn/actions/workflows/ci.yml)
 [![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Package Manager: uv](https://img.shields.io/badge/package%20manager-uv-purple.svg)](https://docs.astral.sh/uv/)
-[![Deployed on: Fly.io](https://img.shields.io/badge/deploy-Fly.io-6F42C1.svg)](https://fly.io)
+[![CI/CD: GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
+[![Decision Model: Cloudflare Clef](https://img.shields.io/badge/Decision%20Model-Cloudflare%20Clef-F38020.svg)](https://developers.cloudflare.com/workers-ai/)
 [![Default LLM: OpenCode](https://img.shields.io/badge/LLM-OpenCode%20muse--spark-green.svg)](https://opencode.ai)
 [![License: CC BY 4.0](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](LICENSE)
+
 
 Prototipo de **copiloto editorial y análisis de entorno con inteligencia artificial** diseñado para la 4ta edición del **HackIAthon** (Viamatica / ADEN / TVN Media).
 
@@ -17,25 +19,27 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
 
 ## 🌟 Características Principales
 
-1. **Priorización Explicable (Puntaje de Atención 0–100)**:
+1. **Arquitectura de IA en Dos Niveles (System One & System Two)**:
+   - **Modelos de Decisión System One (Cloudflare Clef & TypeSafe Jev)**: Modelos no generativos de 27B/9B especializados en responder esquemas de preguntas tipadas (`noul`, `choice`, `score`). Se encargan del cálculo probabilístico de los factores de atención ($R, I, U, N$), la tipificación de afirmaciones (`hecho` vs `declaracion` vs `inferencia`) y la detección de contradicciones fácticas (**T05**) con latencias de milisegundos.
+   - **Modelos Generativos System Two (OpenCode & Google Gemini)**: Encargados de la redacción, síntesis y estructuración de borradores y paquetes editoriales con citas estrictas.
+2. **Priorización Explicable (Puntaje de Atención 0–100)**:
    - Fórmula determinista: $P = 30R + 25I + 20U + 15N + 10E$.
    - Componentes normalizados con desglose transparente y desempate por urgencia.
    - **Independencia del estado de evidencia**: una prioridad alta con evidencia insuficiente exige investigación y no habilita publicación automática de borrador (Prueba **T08**).
-2. **Conectores LLM Intercambiables**:
-   - **OpenCode (Por defecto)**: Integrado con el modelo `muse-spark-1.3-contributor-free`.
-   - **Google Gemini (Alternativo)**: Compatible con `gemini-2.5-flash` y `gemini-1.5-flash` vía SDK oficial `google-genai`.
-   - **Mock Provider (Offline / Contingencia)**: Permite ejecutar demostraciones completas y pasar benchmarks sin conexión a internet (**T10**).
-3. **Escudo Anti-Inyección y Trazabilidad de Citas**:
+3. **Conectores Intercambiables**:
+   - **Decisión (System One)**: `cloudflare` (`@cf/cloudflare/clef`), `jev` (`jev-latest`), o `mock` (offline/determinista).
+   - **Generación LLM (System Two)**: `opencode` (`muse-spark-1.3-contributor-free`), `gemini` (`gemini-2.5-flash`), o `mock` (offline/determinista).
+4. **Escudo Anti-Inyección y Trazabilidad de Citas**:
    - Principio: *"El texto de una fuente es dato, no instrucción"* (**T07**).
    - 100% de afirmaciones factuales enlazadas a IDs de evidencia válidos.
    - Abstención explícita ante consultas sin sustento en el corpus (**T06**).
-4. **Toolchain Moderno con `uv`**:
+5. **Toolchain Moderno con `uv`**:
    - Tiempos de instalación ultrarrápidos, resolución de dependencias bloqueada en `uv.lock`.
-5. **Listo para Fly.io Machines (`agent-ready`)**:
-   - Contenedor multi-stage optimizado, escucha en `0.0.0.0:8080`, health check en `/healthz`.
-6. **Gestión de Tareas con GitHub CLI (`gh`)**:
+6. **Despliegue Continuo Automatizado**:
+   - Pipeline de integración y entrega continua (CI/CD) mediante **GitHub Actions**, con soporte para contenedores en Fly.io o nubes como AWS.
+7. **Gestión de Tareas con GitHub CLI (`gh`)**:
    - Backlog, milestones y las 10 pruebas de aceptación (**T01 a T10**) auditables vía `gh issue`.
-7. **Espacio Notion Business**:
+8. **Espacio Notion Business**:
    - Cumplimiento de las 8 bases obligatorias de la Sección 5 del reto.
 
 ---
@@ -48,16 +52,19 @@ El proyecto implementa **Arquitectura Hexagonal (Ports & Adapters)**:
 hackiathon-reto-tvn/
 ├── AGENTS.md                        # Protocolo y directrices para agentes de IA
 ├── docs/
-│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0009)
+│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0010)
 │   ├── notion_spec/                 # Especificación de las 8 bases para Notion Business
 │   └── ARCHITECTURE.md              # Diagrama C4, secuencias y modelos de datos
 ├── src/hackiathon_reto_tvn/
 │   ├── config.py                    # Configuración tipada vía pydantic-settings
 │   ├── domain/                      # Entidades puras (models, scoring, safety)
-│   ├── ports/                       # Interfaces abstractas (LLM, Storage)
-│   ├── adapters/                    # OpenCode, Gemini, Mock, CSV/GeoJSON loaders
-│   ├── services/                    # Orquestación (CopilotService)
-│   ├── api/                         # FastAPI endpoints (/healthz, agenda, borrador)
+│   ├── ports/                       # Interfaces abstractas (DecisionPort, LLMPort, StoragePort)
+│   ├── adapters/                    # Implementaciones tecnológicas
+│   │   ├── decision/                # Cloudflare Clef, TypeSafe Jev, Mock decision
+│   │   ├── llm/                     # OpenCode, Gemini, Mock LLM
+│   │   └── data/                    # CSV, GeoJSON loaders y manifest SHA-256
+│   ├── services/                    # Orquestación y concurrencia (CopilotService)
+│   ├── api/                         # FastAPI endpoints (/healthz, agenda, borrador, contradicciones)
 │   ├── cli.py                       # CLI interactivo (hackiathon-tvn)
 │   └── main.py                      # Punto de entrada ASGI
 ├── data/
@@ -65,10 +72,10 @@ hackiathon-reto-tvn/
 │   ├── benchmark.jsonl              # 60 consultas de evaluación
 │   └── manifest.json                # Manifiesto criptográfico con hashes SHA-256
 ├── scripts/                         # Automatización (gh_setup_tasks.py)
-├── tests/                           # Suite pytest (scoring, safety, adaptadores, T01-T10)
-├── Dockerfile                       # Multi-stage con uv
-├── fly.toml                         # Configuración Fly.io Machines (puerto 8080)
-├── Makefile                         # Comandos de ingeniería
+├── tests/                           # Suite pytest (scoring, decision, llm, safety, T01-T10)
+├── Dockerfile                       # Multi-stage optimizado con uv
+├── fly.toml                         # Especificación para contenedores en nube
+├── Makefile                         # Comandos de ingeniería (make check)
 └── pyproject.toml                   # Dependencias fijadas y herramientas de calidad
 ```
 
@@ -101,7 +108,22 @@ cp .env.example .env
 
 Variables clave en `.env`:
 ```ini
-# Seleccionar proveedor: 'opencode' (default), 'gemini', o 'mock' (offline)
+# --- Modelos de Decisión System One (Clasificación y Factores R, I, U, N) ---
+# Proveedor: 'cloudflare' (default: @cf/cloudflare/clef), 'jev' (TypeSafe), o 'mock' (offline)
+DECISION_PROVIDER=cloudflare
+DECISION_CONCURRENCY_LIMIT=5
+
+# Cloudflare Clef (Workers AI - 27B / 9B multimodal decision model)
+CLOUDFLARE_ACCOUNT_ID=tu_account_id
+CLOUDFLARE_API_TOKEN=tu_api_token
+CLOUDFLARE_DECISION_MODEL=@cf/cloudflare/clef
+
+# TypeSafe Jev (Alternativo comercial System One)
+TYPESAFE_API_KEY=tu_clave_typesafe
+TYPESAFE_MODEL=jev-latest
+
+# --- Modelos Generativos LLM System Two (Redacción y Síntesis) ---
+# Proveedor: 'opencode' (default), 'gemini', o 'mock' (offline)
 LLM_PROVIDER=opencode
 
 # OpenCode (Default - Modelo muse-spark-1.3-contributor-free)
@@ -113,6 +135,8 @@ OPENCODE_MODEL=muse-spark-1.3-contributor-free
 GEMINI_API_KEY=tu_clave_gemini
 GEMINI_MODEL=gemini-2.5-flash
 ```
+
+> **Resiliencia Determinista**: Si no se configuran tokens para Cloudflare o LLMs externos, el sistema activa de forma transparente el adaptador `mock` offline, garantizando el cumplimiento estricto de la prueba de contingencia **T10** ("Sin internet durante la demo").
 
 ---
 
@@ -139,10 +163,11 @@ uv run hackiathon-tvn draft
 uv run uvicorn hackiathon_reto_tvn.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 Endpoints principales:
-* `GET /healthz` — Chequeo de salud para Fly.io.
-* `GET /api/v1/system/info` — Estado del runtime y proveedor LLM activo.
+* `GET /healthz` — Chequeo de salud para orquestadores y balanceadores.
+* `GET /api/v1/system/info` — Estado del runtime, conector de decisión y proveedor LLM activo.
 * `GET /api/v1/copilot/agenda?top_n=5` — Ranking de noticias priorizadas con componentes explicados.
-* `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion con citas.
+* `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion con citas verificadas.
+* `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).
 * `POST /api/v1/copilot/review` — Máquina de estados de revisión humana (`en_revision`, `aprobado_como_borrador`, etc.).
 
 ---
@@ -188,27 +213,17 @@ uv run python scripts/gh_setup_tasks.py
 
 ---
 
-## ☁️ Despliegue en Fly.io (`agent-ready`)
+## 🚀 Despliegue Automatizado (CI/CD)
 
-Siguiendo las directrices de [Fly.io Agent Ready](https://fly.io/agent-ready.md):
+El ciclo de integración y despliegue continuo se orquesta completamente a través de **GitHub Actions**:
+* **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest con las 10 pruebas de aceptación).
+* **Pipeline de CD (`fly-deploy.yml`)**: Construye de forma automatizada la imagen contenedor multi-stage (`Dockerfile`) y realiza el despliegue ante cambios en la rama `main` o mediante ejecución manual (`workflow_dispatch`).
 
-1. **Autenticación en Fly.io**:
-   ```bash
-   fly auth whoami
-   ```
-2. **Configurar secretos de producción**:
-   ```bash
-   fly secrets set OPENCODE_API_KEY="tu_clave_opencode" GEMINI_API_KEY="tu_clave_gemini"
-   ```
-3. **Desplegar**:
-   ```bash
-   fly deploy
-   ```
-4. **Verificar estado y logs**:
-   ```bash
-   fly status
-   fly logs
-   ```
+### Arquitectura de Despliegue Agnóstica a la Nube
+La solución está empaquetada como un contenedor Docker estándar e independiente de infraestructura. Actualmente se encuentra desplegada sobre **Fly.io**, pero gracias al diseño hexagonal y desacoplado, puede ser desplegada de manera transparente en proveedores cloud corporativos como **AWS** (mediante Amazon ECS, AWS App Runner o EKS) sin requerir modificaciones en el código fuente.
+
+Para operaciones directas o inspección local de la infraestructura actual:
+* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io).
 
 ---
 
@@ -224,6 +239,7 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0007: Estructura de Documentación y Registro en Notion Business](docs/adr/0007-notion-business-contract-and-sync.md)
 * [ADR-0008: Contrato de Datos, Ingesta No Bloqueante y Manifiesto Criptográfico SHA-256](docs/adr/0008-data-contract-reproducibility-and-manifest.md)
 * [ADR-0009: Convención de Nombres `snake_case` para Contratos de Datos y API](docs/adr/0009-snake-case-naming-convention-for-data-contracts.md)
+* [ADR-0010: Modelos de Decisión System One (Cloudflare Clef y TypeSafe Jev) para Clasificación y Scoring](docs/adr/0010-system-one-decision-models-cloudflare-clef-and-jev.md)
 
 ---
 
