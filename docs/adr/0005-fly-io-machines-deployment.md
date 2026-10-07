@@ -11,7 +11,7 @@ Requisitos técnicos clave para evitar los fallos más frecuentes en Fly.io:
 * El servidor debe escuchar en `0.0.0.0` y nunca en `localhost`.
 * El puerto interno configurado en `fly.toml` (`internal_port`) debe coincidir exactamente con el puerto donde corre la aplicación (`8080`).
 * La imagen de contenedor debe construirse de forma eficiente y ligera.
-* Las credenciales nunca deben comitearse en el código ni en `fly.toml`, sino suministrarse mediante secretos (`fly secrets set`).
+* Las credenciales nunca deben comitearse en el código ni en `fly.toml`, sino suministrarse mediante secretos cifrados en la plataforma.
 
 ## Decisión
 
@@ -26,8 +26,7 @@ Requisitos técnicos clave para evitar los fallos más frecuentes en Fly.io:
    * Endpoint de monitoreo `/healthz` con chequeo HTTP cada 15 segundos.
    * Configuración de escalado a cero (`auto_stop_machines = "stop"`, `auto_start_machines = true`) para optimizar costos de máquina cuando no reciba peticiones.
 3. **Flujo de Despliegue y Conexión de Repositorio**:
-   * Despliegue automatizado continuo mediante GitHub Actions (`.github/workflows/fly-deploy.yml`) conectado con secreto `FLY_API_TOKEN`.
-   * Despliegue bajo demanda con `fly deploy`.
+   * Despliegue gestionado exclusivamente a través de los flujos automatizados de GitHub Actions.
 
 ## Consecuencias
 

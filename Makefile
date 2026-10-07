@@ -60,8 +60,5 @@ docker-build:
 docker-run:
 	docker run -p 8080:8080 --env-file .env hackiathon-reto-tvn:latest
 
-fly-status:
-	fly status
-
-fly-deploy:
-	fly deploy
+deploy:
+	gh workflow run fly-deploy.yml

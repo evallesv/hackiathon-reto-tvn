@@ -199,6 +199,6 @@ El ciclo de integración y despliegue continuo se encuentra completamente automa
 ### Portabilidad de Infraestructura
 La solución está empaquetada como un contenedor agnóstico de la infraestructura. Si bien el entorno de producción actual se ejecuta sobre **Fly.io**, la arquitectura está diseñada para migrarse con facilidad a infraestructuras cloud corporativas como **AWS** (Amazon ECS / App Runner / EKS) sin requerir modificaciones en la lógica del sistema.
 
-Para control local o depuración operativa:
-* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io).
+El despliegue y la entrega continua se orquestan exclusivamente mediante los flujos automatizados de **GitHub Actions**.
+
 

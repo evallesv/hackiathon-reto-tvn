@@ -91,7 +91,6 @@ hackiathon-reto-tvn/
   curl -LsSf https://astral.sh/uv/install.sh | sh
   ```
 * [gh](https://cli.github.com/) (GitHub CLI autenticado con `gh auth login`).
-* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io).
 
 ### 2. Clonar e Instalar Dependencias
 ```bash
@@ -232,20 +231,12 @@ gh issue close 9
 
 ## 🚀 Despliegue Automatizado (CI/CD)
 
-El ciclo de integración y despliegue continuo se orquesta completamente a través de **GitHub Actions**:
+El ciclo de integración y despliegue continuo se orquesta exclusivamente a través de **GitHub Actions**:
 * **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest con las 10 pruebas de aceptación).
-* **Pipeline de CD (`fly-deploy.yml`)**: Construye de forma automatizada la imagen contenedor multi-stage (`Dockerfile`) y realiza el despliegue ante cambios en la rama `main` o mediante ejecución manual (`workflow_dispatch`).
+* **Pipeline de CD (`fly-deploy.yml`)**: Construye de forma automatizada la imagen contenedor multi-stage (`Dockerfile`) y realiza el despliegue ante cambios en la rama `main` o mediante ejecución manual con GitHub CLI (`gh workflow run fly-deploy.yml`).
 
 ### Arquitectura de Despliegue Agnóstica a la Nube
-La solución está empaquetada como un contenedor Docker estándar e independiente de infraestructura. Actualmente se encuentra desplegada sobre **Fly.io**, pero gracias al diseño hexagonal y desacoplado, puede ser desplegada de manera transparente en proveedores cloud corporativos como **AWS** (mediante Amazon ECS, AWS App Runner o EKS) sin requerir modificaciones en el código fuente.
-
-Para operaciones directas o inspección local de la infraestructura actual:
-* [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io):
-  ```bash
-  fly status                           # Estado de máquinas
-  fly volumes list                     # Volúmenes persistentes montados (sentria_data)
-  fly logs                             # Logs en tiempo real
-  ```
+La solución está empaquetada como un contenedor Docker estándar e independiente de infraestructura. Actualmente se encuentra conectada para entrega continua sobre **Fly.io**, pero gracias al diseño hexagonal y desacoplado, puede ser desplegada de manera transparente en proveedores cloud corporativos como **AWS** (mediante Amazon ECS, AWS App Runner o EKS) sin requerir modificaciones en el código fuente.
 
 ---
 

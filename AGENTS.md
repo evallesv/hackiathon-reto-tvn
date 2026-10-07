@@ -35,7 +35,7 @@ This repository implements a production-grade AI copilot for **TVN Media** (edit
 
 ### 2.3. NEVER DO
 - **NEVER use `pip`, `poetry`, or `conda`**: Direct use of `pip install` breaks deterministic lockfiles.
-- **NEVER commit secrets or API keys**: Keep `.env` ignored. Use `.env.example` for documentation and `fly secrets set` for deployment.
+- **NEVER commit secrets or API keys**: Keep `.env` ignored. Use `.env.example` for documentation and encrypted repository secrets for deployment.
 - **NEVER read, print, or echo `.env`**: It contains live credentials. Inspect `.env.example` or `config.py` instead.
 - **NEVER auto-label news as true or false**: The system provides evidence signals and missing check items; final verification remains strictly human.
 - **NEVER allow high score to bypass evidence check**: A high attention score with insufficient evidence mandates investigation; it NEVER enables draft publication (Acceptance Test **T08**).
@@ -84,14 +84,7 @@ curl -s -X POST http://localhost:8080/api/v1/ingestion/trigger
 gh issue list                        # View open issues and acceptance test status
 gh issue view <ISSUE_ID>             # View task details
 gh workflow run fly-deploy.yml       # Trigger deployment workflow manually
-
-# Deployment & Ops (Automated via GitHub Actions; local ops via flyctl)
-# Reference: [flyctl](https://fly.io/docs/hands-on/install-flyctl/) (para despliegue en Fly.io)
-fly status                           # Inspect Fly Machines status
-fly volumes list                     # List attached persistent volumes (sentria_data)
-fly logs                             # Stream remote server logs
-fly secrets set KEY=VALUE            # Inject remote runtime secrets
-fly deploy                           # Deploy Machines image from Dockerfile
+gh workflow view fly-deploy.yml      # Inspect deployment status and runs
 ```
 
 ---
