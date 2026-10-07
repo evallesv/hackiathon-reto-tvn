@@ -123,3 +123,66 @@ def test_sqlite_storage_upsert_indicadores_and_eventos(tmp_path: Path) -> None:
     runs = storage.get_latest_runs(limit=5)
     assert len(runs) == 1
     assert runs[0]["estado"] == "SUCCESS"
+
+
+def _dataset_record(resource_id: str, record_id: int, **payload: object) -> dict[str, object]:
+    return {
+        "categoria": "gobierno-finanzas",
+        "titulo_dataset": "Planilla de prueba",
+        "organizacion": "Entidad X",
+        "anio": 2026,
+        "mes": 9,
+        "resource_id": resource_id,
+        "record_id": record_id,
+        "payload": {"_id": record_id, **payload},
+    }
+
+
+def test_sqlite_storage_creates_datasets_live_and_has_table(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "test.db")
+    assert storage.has_table("datasets_live") is False  # el archivo aún no existe
+
+    storage.init_db()
+    assert storage.has_table("datasets_live") is True
+    assert storage.get_stats()["total_datasets"] == 0
+
+
+def test_sqlite_storage_replace_dataset_records_preserves_nulls_and_replaces(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "test.db")
+    storage.init_db()
+
+    first = [_dataset_record("res-1", 1, salario=None), _dataset_record("res-1", 2, salario="1,200.00")]
+    assert storage.replace_dataset_records("planilla-2026", first) == 2
+
+    # Una segunda corrida con otro recurso reemplaza el dataset completo: no quedan filas viejas.
+    second = [_dataset_record("res-2", 1, salario="900.00")]
+    assert storage.replace_dataset_records("planilla-2026", second) == 1
+    assert storage.get_stats()["total_datasets"] == 1
+
+    with storage.get_connection() as conn:
+        row = conn.execute("SELECT categoria, anio, mes, payload_json FROM datasets_live").fetchone()
+    assert row["categoria"] == "gobierno-finanzas"
+    assert (row["anio"], row["mes"]) == (2026, 9)
+    assert '"salario": "900.00"' in row["payload_json"]
+
+
+def test_sqlite_storage_replace_dataset_records_keeps_null_values(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "test.db")
+    storage.init_db()
+    storage.replace_dataset_records("planilla-2026", [_dataset_record("res-1", 1, salario=None)])
+
+    with storage.get_connection() as conn:
+        payload = conn.execute("SELECT payload_json FROM datasets_live").fetchone()["payload_json"]
+    assert '"salario": null' in payload  # nunca se imputa 0
+
+
+def test_sqlite_storage_prune_datasets(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "test.db")
+    storage.init_db()
+    storage.replace_dataset_records("a", [_dataset_record("res-a", 1)])
+    storage.replace_dataset_records("b", [_dataset_record("res-b", 1)])
+
+    assert storage.prune_datasets(["a"]) == 1
+    assert storage.get_stats()["total_datasets"] == 1
+    assert storage.prune_datasets([]) == 1
+    assert storage.get_stats()["total_datasets"] == 0

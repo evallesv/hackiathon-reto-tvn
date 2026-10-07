@@ -112,6 +112,28 @@ class SQLiteStorage:
                 CREATE INDEX IF NOT EXISTS idx_eventos_time
                 ON eventos_live(time DESC);
 
+                CREATE TABLE IF NOT EXISTS datasets_live (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    dataset TEXT NOT NULL,
+                    categoria TEXT,
+                    titulo_dataset TEXT,
+                    organizacion TEXT,
+                    anio INTEGER NOT NULL,
+                    mes INTEGER NOT NULL,
+                    resource_id TEXT NOT NULL,
+                    record_id INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    fecha_extraccion TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE(resource_id, record_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_datasets_dataset
+                ON datasets_live(dataset);
+
+                CREATE INDEX IF NOT EXISTS idx_datasets_categoria
+                ON datasets_live(categoria);
+
                 CREATE TABLE IF NOT EXISTS ingestion_runs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     fuente TEXT NOT NULL,
@@ -252,6 +274,58 @@ class SQLiteStorage:
                     processed += 1
         return processed
 
+    def has_table(self, name: str) -> bool:
+        """Return True if the table exists (lets standalone scripts fail clearly instead of creating schema)."""
+        if not self.db_path.exists():
+            return False
+        with self.get_connection() as conn:
+            row = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (name,)).fetchone()
+            return row is not None
+
+    def replace_dataset_records(self, dataset: str, records: list[dict[str, Any]]) -> int:
+        """Replace every stored row of an open-data dataset with the given records (one transaction).
+
+        Each record carries `categoria`, `titulo_dataset`, `organizacion`, `anio`, `mes`, `resource_id`,
+        `record_id` and `payload` (the raw row, nulls preserved). Replacing the whole dataset keeps stale rows from
+        previous runs out of the table.
+        """
+        now_utc = datetime.now(timezone.utc).isoformat()
+        with self.get_connection() as conn:
+            conn.execute("DELETE FROM datasets_live WHERE dataset = ?", (dataset,))
+            for rec in records:
+                conn.execute(
+                    """
+                    INSERT INTO datasets_live (
+                        dataset, categoria, titulo_dataset, organizacion, anio, mes,
+                        resource_id, record_id, payload_json, fecha_extraccion, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    (
+                        dataset,
+                        rec.get("categoria"),
+                        rec.get("titulo_dataset"),
+                        rec.get("organizacion"),
+                        int(rec["anio"]),
+                        int(rec["mes"]),
+                        rec["resource_id"],
+                        int(rec["record_id"]),
+                        json.dumps(rec["payload"], ensure_ascii=False),
+                        now_utc,
+                        now_utc,
+                    ),
+                )
+        return len(records)
+
+    def prune_datasets(self, keep: list[str]) -> int:
+        """Delete rows of datasets that are not in `keep`, returning how many rows were removed."""
+        with self.get_connection() as conn:
+            if keep:
+                marks = ",".join("?" * len(keep))
+                cursor = conn.execute(f"DELETE FROM datasets_live WHERE dataset NOT IN ({marks})", keep)
+            else:
+                cursor = conn.execute("DELETE FROM datasets_live")
+            return cursor.rowcount
+
     def record_run(
         self,
         fuente: str,
@@ -278,6 +352,7 @@ class SQLiteStorage:
             c_noticias = conn.execute("SELECT COUNT(*) FROM noticias_live").fetchone()[0]
             c_indicadores = conn.execute("SELECT COUNT(*) FROM indicadores_live").fetchone()[0]
             c_eventos = conn.execute("SELECT COUNT(*) FROM eventos_live").fetchone()[0]
+            c_datasets = conn.execute("SELECT COUNT(*) FROM datasets_live").fetchone()[0]
             c_runs = conn.execute("SELECT COUNT(*) FROM ingestion_runs").fetchone()[0]
             latest_run = conn.execute(
                 "SELECT fuente, estado, registros_nuevos, finished_at FROM ingestion_runs ORDER BY id DESC LIMIT 1"
@@ -291,6 +366,7 @@ class SQLiteStorage:
             "total_noticias": c_noticias,
             "total_indicadores": c_indicadores,
             "total_eventos": c_eventos,
+            "total_datasets": c_datasets,
             "total_runs": c_runs,
             "latest_run": dict(latest_run) if latest_run else None,
         }

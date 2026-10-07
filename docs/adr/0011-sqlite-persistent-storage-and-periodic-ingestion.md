@@ -23,7 +23,8 @@ Para persistir estos datos sin depender de bases de datos externas pesadas o con
 
 2. **Base de Datos Embebida SQLite con Modo WAL**:
    - Se implementó `SQLiteStorage` en `src/hackiathon_reto_tvn/adapters/data/sqlite_storage.py`.
-   - Esquema relacional con tablas: `noticias_live`, `indicadores_live`, `eventos_live` e `ingestion_runs`.
+   - Esquema relacional con tablas: `noticias_live`, `indicadores_live`, `eventos_live`, `datasets_live` e `ingestion_runs`.
+   - `datasets_live` guarda filas de datos abiertos del catálogo CKAN `datosabiertos.gob.pa` (un dataset por categoría) como **fuente de contraste de las noticias**, igual que sismos e indicadores. Como cada dataset tiene columnas distintas, la fila cruda se guarda en `payload_json` (nulos preservados, sin imputar), con `dataset`, `categoria`, `anio` y `mes` como columnas de consulta. La ingesta (`scripts/ingesta_datasets.py`) no crea el esquema —lo crea `init_db` al iniciar el app— y registra cada dataset en `ingestion_runs` (`fuente = datos_abiertos:<dataset>`).
    - Concurrencia segura configurada con `PRAGMA journal_mode=WAL;`, `PRAGMA busy_timeout=5000;` y `PRAGMA synchronous=NORMAL;`.
    - Ruta configurable mediante `SQLITE_DB_PATH` (`/data/copilot.db` en producción, `data/storage/copilot.db` localmente).
 
