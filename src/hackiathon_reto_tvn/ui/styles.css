@@ -461,6 +461,24 @@ body {
     align-items: center;
     gap: 0.4rem;
 }
+.agenda-source-banner {
+    margin: 0.9rem 0 1.1rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+}
+.agenda-source-live {
+    border-color: rgba(16, 185, 129, 0.35);
+    background: rgba(16, 185, 129, 0.08);
+    color: #A7F3D0;
+}
+.agenda-source-snapshot {
+    border-color: rgba(245, 158, 11, 0.35);
+    background: rgba(245, 158, 11, 0.08);
+    color: #FCD34D;
+}
 .sources-tag {
     background: rgba(30, 41, 59, 0.8);
     padding: 0.15rem 0.45rem;

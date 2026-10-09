@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // View 1 (Agenda)
         agendaContainer: document.getElementById('agenda-cards-container'),
+        agendaSourceBanner: document.getElementById('agenda-source-banner'),
         filterBanda: document.getElementById('filter-banda'),
         btnRefreshAgenda: document.getElementById('btn-refresh-agenda'),
         t08AlertContainer: document.getElementById('t08-alert-container'),
@@ -130,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/v1/copilot/agenda?top_n=10');
             if (res.ok) {
                 state.agenda = await res.json();
+                renderAgendaSource();
                 renderAgenda();
             } else {
                 elements.agendaContainer.innerHTML = `<div class="empty-state"><p>Error cargando la agenda.</p></div>`;
@@ -139,9 +141,33 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fallback from fichas
             if (state.fichas.length > 0) {
                 state.agenda = state.fichas;
+                renderAgendaSource();
                 renderAgenda();
             }
         }
+    }
+
+    function renderAgendaSource() {
+        if (!elements.agendaSourceBanner) return;
+        const liveCases = state.agenda.filter(item => item.origen_datos === 'ingesta_viva');
+        if (liveCases.length) {
+            const timestamps = liveCases
+                .map(item => item.fecha_actualizacion_fuente)
+                .filter(Boolean)
+                .map(value => ({ value, epoch: Date.parse(value) }))
+                .filter(item => !Number.isNaN(item.epoch))
+                .sort((left, right) => right.epoch - left.epoch);
+            const newest = timestamps[0] ? new Date(timestamps[0].epoch) : null;
+            const formatted = newest && !Number.isNaN(newest.getTime())
+                ? newest.toLocaleString('es-PA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Panama' })
+                : 'fecha de publicación no disponible';
+            elements.agendaSourceBanner.className = 'agenda-source-banner agenda-source-live';
+            elements.agendaSourceBanner.textContent = `Noticias recientes de la ingesta viva · fecha más reciente entre los casos mostrados: ${formatted}`;
+            return;
+        }
+
+        elements.agendaSourceBanner.className = 'agenda-source-banner agenda-source-snapshot';
+        elements.agendaSourceBanner.textContent = 'Corpus histórico congelado · esta agenda es de referencia y no representa noticias actuales.';
     }
 
     function renderAgenda() {

@@ -37,6 +37,7 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
    - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
+   - La agenda usa noticias recientes persistidas en SQLite (ventana configurable `LIVE_AGENDA_MAX_AGE_HOURS`, 72 horas por defecto); cuando no hay ingesta reciente, muestra el snapshot congelado con una advertencia visible. El entorno de pruebas sigue usando solo el snapshot.
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
    - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.

@@ -5,7 +5,7 @@ for HackIAthon 'De la señal a la decisión'.
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -168,6 +168,8 @@ class FichaCaso(BaseModel):
     persona_revisora: Optional[str] = None
     fecha_creacion: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     observaciones_revision: Optional[str] = None
+    origen_datos: Literal["ingesta_viva", "snapshot_congelado"] = "snapshot_congelado"
+    fecha_actualizacion_fuente: Optional[str] = None
 
 
 class ManifestItem(BaseModel):

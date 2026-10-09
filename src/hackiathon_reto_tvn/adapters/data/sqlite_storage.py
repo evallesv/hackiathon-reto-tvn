@@ -452,9 +452,10 @@ class SQLiteStorage:
             rows = conn.execute(
                 """
                 SELECT id_noticia, titulo, url, medio, idioma,
-                       fecha_publicacion, tema, origen, resumen, created_at
+                       fecha_publicacion, fecha_deteccion, fecha_extraccion,
+                       tema, origen, alcance_texto, resumen, created_at
                 FROM noticias_live
-                ORDER BY fecha_publicacion DESC
+                ORDER BY COALESCE(NULLIF(fecha_publicacion, ''), fecha_deteccion) DESC
                 LIMIT ?
                 """,
                 (limit,),

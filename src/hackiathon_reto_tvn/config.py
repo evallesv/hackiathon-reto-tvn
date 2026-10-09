@@ -104,6 +104,11 @@ class Settings(BaseSettings):
         default=60,
         description="Intervalo en minutos para la ingesta periódica en segundo plano",
     )
+    LIVE_AGENDA_MAX_AGE_HOURS: int = Field(
+        default=72,
+        ge=1,
+        description="Antigüedad máxima de una noticia viva para considerarla actual en la agenda",
+    )
 
     # Notion Integration
     NOTION_API_KEY: str = ""

@@ -4,11 +4,14 @@ editorial draft generation, and human-in-the-loop review.
 """
 
 import asyncio
+import hashlib
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from hackiathon_reto_tvn.adapters.data.loaders import EventGrouper, LocalStorageRepository
+from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 from hackiathon_reto_tvn.adapters.decision.factory import get_decision_client
 from hackiathon_reto_tvn.adapters.llm.factory import get_llm_client
 from hackiathon_reto_tvn.config import Settings, get_settings
@@ -60,6 +63,55 @@ class CopilotService:
         noticias = self.repo.load_noticias(path)
         return noticias, len(noticias)
 
+    @staticmethod
+    def _parse_source_datetime(value: str) -> Optional[datetime]:
+        """Parse an ISO source timestamp and normalize it to UTC."""
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+    def load_agenda_corpus(self) -> Tuple[List[Noticia], Literal["ingesta_viva", "snapshot_congelado"]]:
+        """Prefer recent SQLite news in runtime; preserve the frozen corpus as an explicit fallback."""
+        if self.settings.ENVIRONMENT != "test" and self.settings.SQLITE_DB_PATH.exists():
+            try:
+                storage = SQLiteStorage(self.settings.SQLITE_DB_PATH)
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=self.settings.LIVE_AGENDA_MAX_AGE_HOURS)
+                live_records = storage.get_latest_noticias(limit=500)
+                current_records: List[Noticia] = []
+                for record in live_records:
+                    published = str(record.get("fecha_publicacion") or "")
+                    detected = str(record.get("fecha_deteccion") or record.get("fecha_extraccion") or "")
+                    effective_date = self._parse_source_datetime(published) or self._parse_source_datetime(detected)
+                    if effective_date is None or effective_date < cutoff:
+                        continue
+                    current_records.append(
+                        Noticia(
+                            id_noticia=str(record.get("id_noticia") or record.get("url") or "noticia_live"),
+                            titulo=str(record.get("titulo") or "").strip(),
+                            url=str(record.get("url") or ""),
+                            medio=str(record.get("medio") or "Desconocido"),
+                            idioma=str(record.get("idioma") or "es"),
+                            fecha_publicacion=published,
+                            fecha_deteccion=detected,
+                            fecha_extraccion=str(record.get("fecha_extraccion") or ""),
+                            tema=str(record.get("tema") or "general"),
+                            origen=str(record.get("origen") or "rss"),
+                            alcance_texto=str(record.get("alcance_texto") or "titular_metadatos"),
+                        )
+                    )
+                current_records = [noticia for noticia in current_records if noticia.titulo and noticia.url]
+                if current_records:
+                    return current_records, "ingesta_viva"
+            except Exception as exc:
+                logger.warning("No se pudo leer la agenda viva; se usará el snapshot congelado: %s", exc)
+
+        noticias, _ = self.load_corpus()
+        return noticias, "snapshot_congelado"
+
     async def prioritize_agenda_async(self, top_n: int = 5) -> List[FichaCaso]:
         """Ranks news stories into an actionable prioritized agenda asynchronously (CU-01 / CU-02).
 
@@ -71,7 +123,7 @@ class CopilotService:
         - Official attention scoring formula P = 30R + 25I + 20U + 15N + 10E
         - Deterministic tie-breaking rules
         """
-        noticias, _ = self.load_corpus()
+        noticias, origen_datos = self.load_agenda_corpus()
         if not noticias:
             return []
 
@@ -79,10 +131,13 @@ class CopilotService:
         clusters = EventGrouper.group_articles(noticias)
         semaphore = asyncio.Semaphore(self.settings.DECISION_CONCURRENCY_LIMIT)
 
-        async def _evaluate_cluster(cluster_idx: int, cluster_items: List[Noticia]) -> FichaCaso:
+        async def _evaluate_cluster(cluster_idx: int, cluster_key: str, cluster_items: List[Noticia]) -> FichaCaso:
             async with semaphore:
                 lead_art = cluster_items[0]
                 recirculated, _ = EventGrouper.detect_recirculated(lead_art)
+                fecha_efectiva = self._parse_source_datetime(lead_art.fecha_publicacion) or self._parse_source_datetime(
+                    lead_art.fecha_deteccion
+                )
 
                 # Build typed decision questions for System One decision model (Clef / Jev)
                 state_text = (
@@ -169,7 +224,11 @@ class CopilotService:
                 ]
 
                 return FichaCaso(
-                    id_caso=f"CASO-{cluster_idx + 1:03d}",
+                    id_caso=(
+                        f"CASO-LIVE-{hashlib.sha256(cluster_key.encode('utf-8')).hexdigest()[:12].upper()}"
+                        if origen_datos == "ingesta_viva"
+                        else f"CASO-{cluster_idx + 1:03d}"
+                    ),
                     modalidad=Modalidad.TVN_EDITORIAL,
                     ids_fuente=[a.id_noticia for a in cluster_items],
                     afirmaciones=afirmaciones,
@@ -179,9 +238,15 @@ class CopilotService:
                     estado_evidencia=estado_evidencia,
                     borrador={},
                     estado_revision=EstadoRevision.NUEVO,
+                    origen_datos=origen_datos,
+                    fecha_actualizacion_fuente=(
+                        fecha_efectiva.isoformat()
+                        if origen_datos == "ingesta_viva" and fecha_efectiva
+                        else lead_art.fecha_publicacion or lead_art.fecha_deteccion or None
+                    ),
                 )
 
-        tasks = [_evaluate_cluster(idx, items) for idx, (_, items) in enumerate(clusters.items())]
+        tasks = [_evaluate_cluster(idx, key, items) for idx, (key, items) in enumerate(clusters.items())]
         fichas = await asyncio.gather(*tasks)
 
         ranked = ScoringEngine.rank_cases(list(fichas))
