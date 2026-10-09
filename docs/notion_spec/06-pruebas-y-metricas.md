@@ -29,6 +29,7 @@ Todas las pruebas se ejecutan de manera automatizada mediante `pytest` con ejecu
 Para evaluar de forma cuantitativa y reproducible el desempeño del copiloto frente a baselines estándar, se diseñó y etiquetó un conjunto de **60 consultas evaluativas** en `data/benchmark.jsonl`:
 - **40 consultas de desarrollo (Dev Set)**: Iteración interna de reglas y evaluación local.
 - **20 consultas reservadas (Jury Set)**: Están en el repositorio y no son ciegas; requieren custodia externa para una evaluación independiente.
+- Un holdout nuevo debe ser proporcionado como JSONL externo con filas `conjunto=reservado_jurado`; tanto el archivo como el reporte quedan fuera del repositorio.
 - **Distribución de Tipologías**:
   - 30 consultas soportadas con hechos en el corpus (TVN, Banco Mundial, USGS).
   - 10 consultas de contradicción factual entre dos versiones.
@@ -48,7 +49,7 @@ En las 20 consultas sustentadas de desarrollo, el valor esperado principal y el 
 Contradicciones: diez pares sintéticos comparados entre regex y el adaptador de decisión configurado. En modo `mock`, Macro-F1 fue 0.792 para regex y 0.524 para el mock (`mock-clef-offline`). No representa desempeño de un modelo remoto ni una muestra editorial independiente.
 
 Citas/abstención: 20/20 respuestas sustentadas citaron IDs existentes; abstención y marcador adversarial se detectaron en todos los casos de prueba seleccionados. No comprueba que cada afirmación esté citada ni el soporte semántico.
-Latencia: 0.7 ms de mediana y 1.9 ms p95 en modo mock; no representa un proveedor real.
+Latencia: 0.8 ms de mediana y 1.8 ms p95 en la última ejecución mock; no representa un proveedor real.
 ```
 
 ---
@@ -74,6 +75,6 @@ uv run pytest tests/test_acceptance_t01_t10.py -v
 # Ejecutar el benchmark de desarrollo (40 consultas); no ejecuta las 20 etiquetas reservadas expuestas
 make benchmark
 
-# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 142 Tests de Pytest)
+# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 144 Tests de Pytest)
 make check
 ```

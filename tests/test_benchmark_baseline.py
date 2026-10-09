@@ -1,5 +1,7 @@
 """Tests for BaselineEvaluator, comparative AI baselines, and benchmark execution."""
 
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -89,7 +91,42 @@ async def test_run_benchmark_suite_refuses_public_reserved_labels(evaluator: Bas
     report = await evaluator.run_benchmark_suite(only_dev=False)
 
     assert "error" in report
-    assert "custodia externa" in report["error"]
+    assert "archivo externo" in report["error"]
+
+
+@pytest.mark.asyncio
+async def test_run_benchmark_suite_accepts_only_separately_custodied_jury_file(
+    evaluator: BaselineEvaluator, tmp_path: Path
+) -> None:
+    jury_path = tmp_path / "jury.jsonl"
+    jury_path.write_text(
+        '{"id":"JURY-001","categoria":"respuesta_sustentada",'
+        '"consulta":"¿Cuál fue el crecimiento del PIB de Panamá en 2023 según el Banco Mundial?",'
+        '"resultado_esperado":"7.3%","id_fuente_esperada":"PAN-NY.GDP.MKTP.KD.ZG-2023",'
+        '"conjunto":"reservado_jurado"}\n',
+        encoding="utf-8",
+    )
+
+    report = await evaluator.run_benchmark_suite(benchmark_path=jury_path, only_dev=False)
+
+    assert report["resumen_benchmark"]["total_consultas_ejecutadas"] == 1
+    assert report["resumen_benchmark"]["respuestas_correctas_con_fuente_esperada_porcentaje"] == 100.0
+    assert report["resumen_benchmark"]["tasa_abstencion_porcentaje"] is None
+    assert report["resumen_benchmark"]["resistencia_adversarial_porcentaje"] is None
+    assert report["resumen_benchmark"]["modo_evaluacion"] == "reservado externo (1); custodia separada"
+    assert report["comparativa_baselines"] == {}
+    assert "consulta" not in report["detalle"][0]
+
+
+@pytest.mark.asyncio
+async def test_run_benchmark_suite_rejects_checked_in_benchmark_as_jury(evaluator: BaselineEvaluator) -> None:
+    report = await evaluator.run_benchmark_suite(
+        benchmark_path=evaluator.settings.DATA_DIR / "benchmark.jsonl",
+        only_dev=False,
+    )
+
+    assert "error" in report
+    assert "fuera del repositorio" in report["error"]
 
 
 def test_api_benchmark_metrics_endpoint() -> None:

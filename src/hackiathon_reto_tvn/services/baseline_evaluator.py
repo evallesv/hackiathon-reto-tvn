@@ -206,14 +206,15 @@ class BaselineEvaluator:
         benchmark_path: Optional[Path] = None,
         only_dev: bool = True,
     ) -> Dict[str, Any]:
-        """Runs the development queries, measuring resolvable citation IDs, abstention, and latency."""
+        """Runs development queries or a separately custodied external jury set."""
         if not only_dev:
-            return {
-                "error": (
-                    "La ejecución completa está deshabilitada: las respuestas reservadas están dentro del repositorio "
-                    "y requieren custodia externa para constituir una evaluación ciega."
-                )
-            }
+            if benchmark_path is None:
+                return {
+                    "error": "El conjunto reservado solo se acepta desde un archivo externo suministrado por su custodio."
+                }
+            project_root = self.settings.DATA_DIR.resolve().parent
+            if benchmark_path.resolve().is_relative_to(project_root):
+                return {"error": "El archivo de jurado debe estar fuera del repositorio del proyecto."}
         path = benchmark_path or (self.settings.DATA_DIR / "benchmark.jsonl")
         if not path.exists():
             return {"error": f"Archivo de benchmark no encontrado en {path}"}
@@ -225,7 +226,14 @@ class BaselineEvaluator:
                 if line:
                     queries.append(json.loads(line))
 
-        eval_queries = [q for q in queries if q.get("conjunto") == "desarrollo"]
+        if only_dev:
+            eval_queries = [q for q in queries if q.get("conjunto") == "desarrollo"]
+        else:
+            if not queries or any(q.get("conjunto") != "reservado_jurado" for q in queries):
+                return {"error": "El archivo externo debe contener exclusivamente filas con conjunto=reservado_jurado."}
+            eval_queries = queries
+        if not eval_queries:
+            return {"error": "El archivo de benchmark no contiene consultas del conjunto solicitado."}
         evaluation_service = self._offline_evaluation_service()
         valid_source_ids = self._known_query_source_ids(evaluation_service)
 
@@ -288,7 +296,6 @@ class BaselineEvaluator:
                 {
                     "id": q_id,
                     "categoria": cat,
-                    "consulta": consulta,
                     "es_abstencion": resp.es_abstencion,
                     "citas_count": len(resp.citas),
                     "citas_ids_fuente_validos": citation_ids_valid,
@@ -297,6 +304,8 @@ class BaselineEvaluator:
                     "latencia_ms": round(duration_ms, 1),
                 }
             )
+            if only_dev:
+                resultados_detalle[-1]["consulta"] = consulta
 
         # Latency statistics
         latencies_ms.sort()
@@ -304,20 +313,32 @@ class BaselineEvaluator:
         p95_idx = int(len(latencies_ms) * 0.95)
         p95 = latencies_ms[min(p95_idx, len(latencies_ms) - 1)] if latencies_ms else 0.0
 
-        tasa_consultas_con_ids_validos = (respuestas_con_ids_validos / max(1, consultas_sustentadas_evaluadas)) * 100.0
-        tasa_abstencion = (abstencion_correcta / max(1, abstencion_total_esperada)) * 100.0
-        tasa_seguridad = (inyecciones_neutralizadas / max(1, inyecciones_totales)) * 100.0
+        tasa_consultas_con_ids_validos = (
+            round((respuestas_con_ids_validos / consultas_sustentadas_evaluadas) * 100.0, 1)
+            if consultas_sustentadas_evaluadas
+            else None
+        )
+        tasa_abstencion = (
+            round((abstencion_correcta / abstencion_total_esperada) * 100.0, 1) if abstencion_total_esperada else None
+        )
+        tasa_seguridad = (
+            round((inyecciones_neutralizadas / inyecciones_totales) * 100.0, 1) if inyecciones_totales else None
+        )
 
-        ranking_baseline = self.evaluate_ranking_baseline()
-        classification_baseline = await self.evaluate_classification_and_contradictions_baseline()
+        ranking_baseline = self.evaluate_ranking_baseline() if only_dev else None
+        classification_baseline = await self.evaluate_classification_and_contradictions_baseline() if only_dev else None
 
         return {
             "resumen_benchmark": {
                 "total_consultas_ejecutadas": len(eval_queries),
-                "modo_evaluacion": "desarrollo (40); reservado no ejecutado",
+                "modo_evaluacion": (
+                    "desarrollo (40); reservado no ejecutado"
+                    if only_dev
+                    else f"reservado externo ({len(eval_queries)}); custodia separada"
+                ),
                 "consultas_sustentadas_evaluadas": consultas_sustentadas_evaluadas,
                 "respuestas_sustentadas_con_ids_validos": respuestas_con_ids_validos,
-                "respuestas_sustentadas_con_ids_validos_porcentaje": round(tasa_consultas_con_ids_validos, 1),
+                "respuestas_sustentadas_con_ids_validos_porcentaje": tasa_consultas_con_ids_validos,
                 "meta_ids_cita_validos": "100.0%",
                 "limitacion_ids_cita": (
                     "Comprueba que cada respuesta sustentada tenga IDs de fuente existentes en el corpus; "
@@ -326,24 +347,27 @@ class BaselineEvaluator:
                 "respuestas_sustentadas_con_valor_esperado": respuestas_con_valor_esperado,
                 "respuestas_sustentadas_con_fuente_esperada": respuestas_con_fuente_esperada,
                 "respuestas_correctas_con_fuente_esperada": respuestas_correctas_con_fuente,
-                "respuestas_correctas_con_fuente_esperada_porcentaje": round(
-                    (respuestas_correctas_con_fuente / max(1, consultas_sustentadas_evaluadas)) * 100.0, 1
+                "respuestas_correctas_con_fuente_esperada_porcentaje": (
+                    round((respuestas_correctas_con_fuente / consultas_sustentadas_evaluadas) * 100.0, 1)
+                    if consultas_sustentadas_evaluadas
+                    else None
                 ),
                 "limitacion_exactitud_respuesta": (
                     "Coincidencia literal del valor esperado principal y del ID de fuente; no sustituye la revisión "
                     "semántica ni la adjudicación editorial independiente."
                 ),
-                "tasa_abstencion_porcentaje": round(tasa_abstencion, 1),
+                "tasa_abstencion_porcentaje": tasa_abstencion,
                 "meta_tasa_abstencion": ">= 80.0%",
-                "resistencia_adversarial_porcentaje": round(tasa_seguridad, 1),
+                "resistencia_adversarial_porcentaje": tasa_seguridad,
                 "latencia_mediana_ms": round(p50, 1),
                 "latencia_p95_ms": round(p95, 1),
                 "meta_latencia": "mediana <= 15000 ms (15 s)",
             },
-            "comparativa_baselines": {
-                "ranking_priorizacion": ranking_baseline,
-                "clasificacion_contradicciones": classification_baseline,
-            },
+            "comparativa_baselines": (
+                {"ranking_priorizacion": ranking_baseline, "clasificacion_contradicciones": classification_baseline}
+                if only_dev
+                else {}
+            ),
             "detalle": resultados_detalle,
         }
 

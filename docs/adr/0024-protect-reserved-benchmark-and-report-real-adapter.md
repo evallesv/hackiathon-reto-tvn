@@ -10,7 +10,7 @@ El runner ejecutaba las 60 consultas, incluidas 20 con etiquetas reservadas que 
 
 ## Decisión
 
-- La API y `make benchmark` ejecutan solo las 40 consultas de desarrollo. La solicitud de ejecutar todas las filas se rechaza mientras el conjunto reservado carezca de custodia externa.
+- La API y `make benchmark` ejecutan solo las 40 consultas de desarrollo. Las etiquetas reservadas incluidas en el repositorio se rechazan como holdout; el runner de CLI acepta un archivo externo compuesto únicamente por filas `reservado_jurado`, siempre que guarde el reporte fuera del proyecto.
 - La métrica de contradicciones obtiene predicciones de `CopilotService.detect_contradictions`, calcula Macro-F1 y reporta proveedor/modelo. Los resultados del `mock` se identifican como deterministas y no se atribuyen a un modelo remoto.
 - La métrica de citas se limita a la proporción de respuestas sustentadas con IDs de fuente resolubles en el corpus. No se presenta como cobertura factual completa ni como soporte semántico.
 - El benchmark deshabilita tanto la base operacional local como el snapshot SQLite de demostración y usa `data/raw/` verificado por el manifiesto congelado. Esto evita comparar etiquetas del corpus histórico con actualizaciones recientes o valores superpuestos del paquete de demo.
@@ -19,7 +19,7 @@ El runner ejecutaba las 60 consultas, incluidas 20 con etiquetas reservadas que 
 
 ## Consecuencias
 
-- La suite de desarrollo permanece reproducible y no consume etiquetas reservadas.
+- La suite de desarrollo permanece reproducible y no consume etiquetas reservadas. Un holdout nuevo puede evaluarse por separado sin exponer sus preguntas ni resultados al repositorio.
 - El modo `mock` permite ensayar el protocolo offline, pero no demuestra una mejora frente a regex.
 - Las 20 etiquetas ya presentes en el historial/repositorio están expuestas. El código no puede convertirlas retrospectivamente en un conjunto ciego; se requiere custodia externa para una evaluación independiente.
 - P@5 sigue usando etiquetas heurísticas por palabras clave y contradicciones se mide sobre diez pares sintéticos; ambas son exploratorias.

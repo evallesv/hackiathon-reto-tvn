@@ -41,7 +41,7 @@ La solución combina un corpus público congelado (para evaluación reproducible
    - `data/snapshot/snapshot.sqlite` empaqueta el corpus congelado y, cuando existe, noticias recientes, indicadores y eventos de la base local. La copia se abre en modo de solo lectura, incluye su manifiesto/hash y excluye revisiones editoriales y bitácoras de ingesta. `make sqlite-snapshot` la genera sin modificar `data/raw/` ni `data/manifest.json`.
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
-   - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
+   - La API ejecuta el conjunto de desarrollo (40); las etiquetas reservadas incluidas en el repositorio no se tratan como ciegas. Un custodio puede evaluar un holdout nuevo mediante un archivo externo, sin guardar sus resultados dentro del proyecto.
    - En ejecución offline del 2026-10-09 sobre `data/raw/` verificado por manifiesto, la recencia obtuvo P@5 **0.20 (1/5)** y la fórmula P **0.40 (2/5)**, una mejora exploratoria de **+100%** basada en etiquetas por palabras clave. El benchmark desactiva SQLite operativo y el snapshot ampliado de demostración.
    - En las 20 consultas sustentadas, el mock coincidió literalmente con el valor y el ID de fuente esperados (**20/20**); esta comprobación de desarrollo no es adjudicación editorial independiente ni mide implicación semántica.
    - La evaluación de contradicciones compara regex con diez pares sintéticos procesados por el adaptador de decisión configurado (`mock`, Cloudflare o Jev); informa Macro-F1 y el proveedor/modelo usados. El modo `mock` es determinista y no representa desempeño de un modelo remoto. La evaluación reservada requiere custodia externa.
@@ -209,6 +209,9 @@ uv run hackiathon-server
 # Ejecutar el benchmark de desarrollo (40 consultas); el conjunto reservado queda deshabilitado
 make benchmark
 
+# Opcional: evaluar un holdout nuevo entregado por un custodio, con entrada y salida fuera del repositorio
+uv run python scripts/run_benchmark.py --jury-file /ruta/segura/jury.jsonl --output /ruta/segura/jury-results.json
+
 # Crear el paquete SQLite offline desde el corpus y la ingesta local disponible
 make sqlite-snapshot
 
@@ -218,7 +221,7 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 142 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 144 tests Pytest)
 make check
 
 # Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
@@ -233,7 +236,7 @@ make prepare-snapshot CANDIDATE_DIR=/private/tmp/snapshot-candidate-2026-10
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **142 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **144 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
