@@ -2,9 +2,10 @@
 # Makefile - HackIAthon TVN Media Engineering Automation
 # ==============================================================================
 
-.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks benchmark audit-snapshot
+.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks benchmark audit-snapshot prepare-snapshot
 
 SNAPSHOT_DIR ?= data
+CANDIDATE_DIR ?= /private/tmp/hackiathon-snapshot-candidate
 
 help:
 	@echo "Comandos disponibles:"
@@ -22,6 +23,7 @@ help:
 	@echo "  make cli           - Ver estado del CLI del copiloto"
 	@echo "  make manifest      - Regenerar manifest.json con hashes SHA-256"
 	@echo "  make audit-snapshot - Auditar cobertura y hashes de una carpeta snapshot (sin escribir)"
+	@echo "  make prepare-snapshot - Crear snapshot temporal (solo se publica si cumple todos los mínimos)"
 	@echo "  make docker-build  - Construir imagen Docker de producción"
 	@echo "  make docker-run    - Correr contenedor Docker local en puerto 8080"
 	@echo "  make fly-status    - Consultar estado de máquinas en Fly.io"
@@ -61,7 +63,7 @@ audit-snapshot:
 	uv run python scripts/audit_snapshot.py --data-dir "$(SNAPSHOT_DIR)"
 
 prepare-snapshot:
-	uv run python scripts/prepare_snapshot.py --output-dir "$(SNAPSHOT_DIR)"
+	uv run python scripts/prepare_snapshot.py --output-dir "$(CANDIDATE_DIR)"
 
 check: lint format-check typecheck test
 

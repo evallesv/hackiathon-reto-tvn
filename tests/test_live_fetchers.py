@@ -60,9 +60,14 @@ async def test_gdelt_seendate_is_detection_time_not_publication_time(monkeypatch
 
 @pytest.mark.asyncio
 async def test_gdelt_rate_limit_is_reported_to_caller(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleep = AsyncMock()
+
+    monkeypatch.setattr("hackiathon_reto_tvn.adapters.data.live_fetchers.asyncio.sleep", sleep)
+
     class Response:
         status_code = 429
         text = "rate limit"
+        headers: dict[str, str] = {}
 
     class AsyncClient:
         async def __aenter__(self) -> "AsyncClient":
@@ -80,6 +85,49 @@ async def test_gdelt_rate_limit_is_reported_to_caller(monkeypatch: pytest.Monkey
 
     with pytest.raises(RuntimeError, match="HTTP 429"):
         await LiveDataFetcher().fetch_gdelt()
+    assert sleep.await_count == LiveDataFetcher.MAX_ATTEMPTS - 1
+
+
+@pytest.mark.asyncio
+async def test_gdelt_retries_rate_limit_and_honors_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleep = AsyncMock()
+    calls = 0
+
+    class Response:
+        def __init__(self, status_code: int) -> None:
+            self.status_code = status_code
+            self.headers = {"content-type": "application/json", "Retry-After": "0"}
+            self.text = '{"articles": []}'
+
+        def json(self) -> dict[str, list[object]]:
+            return {"articles": []}
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            nonlocal calls
+            calls += 1
+            return Response(429 if calls == 1 else 200)
+
+    monkeypatch.setattr("hackiathon_reto_tvn.adapters.data.live_fetchers.asyncio.sleep", sleep)
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    assert await LiveDataFetcher().fetch_gdelt() == []
+    assert calls == 2
+    sleep.assert_awaited_once_with(0.0)
+
+
+@pytest.mark.asyncio
+async def test_gdelt_max_records_respects_api_limit() -> None:
+    with pytest.raises(ValueError, match="between 1 and 250"):
+        await LiveDataFetcher().fetch_gdelt(max_records=251)
 
 
 @pytest.mark.asyncio
@@ -121,6 +169,8 @@ async def test_world_bank_fetch_accepts_full_challenge_year_range(monkeypatch: p
 async def test_world_bank_fetch_keeps_successful_indicators_when_one_request_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr("hackiathon_reto_tvn.adapters.data.live_fetchers.asyncio.sleep", AsyncMock())
+
     class Response:
         status_code = 200
 
@@ -188,7 +238,37 @@ async def test_world_bank_fetch_runs_multiple_requests_concurrently(monkeypatch:
         countries=["PAN", "CRI", "COL"], indicators=["GDP", "CPI"], start_year=2024, end_year=2024
     )
 
-    assert 1 < peak_requests <= 6
+    assert 1 < peak_requests <= 3
+
+
+@pytest.mark.asyncio
+async def test_world_bank_strict_mode_fails_if_any_indicator_request_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("hackiathon_reto_tvn.adapters.data.live_fetchers.asyncio.sleep", AsyncMock())
+
+    class Response:
+        status_code = 503
+        headers: dict[str, str] = {}
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    with pytest.raises(RuntimeError, match="World Bank responses incomplete"):
+        await LiveDataFetcher().fetch_world_bank(
+            countries=["PAN"], indicators=["GDP"], start_year=2024, end_year=2024, strict=True
+        )
 
 
 @pytest.mark.asyncio
@@ -225,6 +305,38 @@ async def test_usgs_fetch_accepts_challenge_period(monkeypatch: pytest.MonkeyPat
     assert "endtime=2025-01-01" in requested_urls[0]
 
 
+@pytest.mark.asyncio
+async def test_usgs_limit_respects_service_maximum() -> None:
+    with pytest.raises(ValueError, match="between 1 and 20000"):
+        await LiveDataFetcher().fetch_usgs(limit=20001)
+
+
+@pytest.mark.asyncio
+async def test_usgs_saturated_result_is_not_accepted_as_complete(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status_code = 200
+
+        def json(self) -> dict[str, list[object]]:
+            return {"features": [object(), object()]}
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    with pytest.raises(RuntimeError, match="results may be truncated"):
+        await LiveDataFetcher().fetch_usgs(limit=2)
+
+
 def test_date_parsing_and_id_generation() -> None:
     # RFC 822
     rfc = "Tue, 06 Oct 2026 23:57:05 +0000"
@@ -236,9 +348,10 @@ def test_date_parsing_and_id_generation() -> None:
     iso_output = _parse_rfc822_or_iso(iso_input)
     assert "2026-10-06" in iso_output
 
-    # Fallback on empty or invalid
+    # Missing or invalid publication dates remain empty; they are never replaced with extraction time.
     fallback = _parse_rfc822_or_iso(None)
-    assert len(fallback) > 10
+    assert fallback == ""
+    assert _parse_rfc822_or_iso("not-a-date") == ""
 
     # ID generation
     url = "https://www.tvn-2.com/nacionales/noticia-1.html"

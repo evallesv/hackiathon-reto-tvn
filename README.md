@@ -211,18 +211,22 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 93 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 109 tests Pytest)
 make check
 
 # Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
 make audit-snapshot SNAPSHOT_DIR=/private/tmp/snapshot-candidate
+
+# Descargar y preparar un candidato. Se publica solo si supera todos los mínimos;
+# si queda incompleto, conserva únicamente un informe .audit-report.json.
+make prepare-snapshot CANDIDATE_DIR=/private/tmp/snapshot-candidate-2026-10
 ```
 
 ---
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **93 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **109 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
@@ -288,6 +292,9 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0011: Almacenamiento Persistente SQLite en Fly.io Volumes e Ingesta Periódica de Fuentes Vivas](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)
 * [ADR-0012: Flujo Git para Desarrollo Multi-Agente, Estandarización en AGENTS.md y Protección de Main](docs/adr/0012-multi-agent-git-workflow-and-main-protection.md)
 * [ADR-0013: Ruteo Unificado OpenCode para Modelos de Decisión System One y Generativos System Two](docs/adr/0013-unified-opencode-routing-for-system-one-and-two.md)
+* [ADR-0014: Evaluación de Baselines y Benchmark Formal de 60 Consultas](docs/adr/0014-baseline-evaluation-and-60-query-benchmark.md)
+* [ADR-0015: Dashboard Web Interactivo Embebido para Demostración al Jurado](docs/adr/0015-embedded-glassmorphism-web-dashboard.md)
+* [ADR-0016: Reintentos y Publicación Atómica de Snapshots Candidatos](docs/adr/0016-resilient-snapshot-candidate-acquisition.md)
 
 ---
 

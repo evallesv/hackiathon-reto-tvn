@@ -2,13 +2,16 @@
 
 import csv
 import json
+import os
+import shutil
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from hackiathon_reto_tvn.adapters.data.live_fetchers import LiveDataFetcher
 from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository
-from hackiathon_reto_tvn.services.snapshot_audit import COUNTRIES, INDICATOR_YEARS, INDICATORS, audit_snapshot
+from hackiathon_reto_tvn.services.snapshot_audit import COUNTRIES, INDICATORS, audit_snapshot
 
 NEWS_FIELDS = (
     "id_noticia",
@@ -33,9 +36,9 @@ INDICATOR_FIELDS = (
     "fecha_extraccion",
     "licencia",
 )
-GDELT_QUERIES = (
+GDELT_QUERY = (
     "panama (economia OR logística OR turismo OR gobierno OR salud OR educación OR seguridad "
-    "OR Canal OR infraestructura OR ambiente OR energía)",
+    "OR Canal OR infraestructura OR ambiente OR energía)"
 )
 
 
@@ -51,16 +54,49 @@ def _validate_candidate_path(output_dir: Path) -> Path:
     return candidate
 
 
+async def _fetch_gdelt_complete(fetcher: LiveDataFetcher, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    """Split saturated 250-record GDELT windows into smaller serial requests."""
+    request_count = 0
+
+    async def fetch_window(window_start: datetime, window_end: datetime, depth: int = 0) -> list[dict[str, Any]]:
+        nonlocal request_count
+        request_count += 1
+        if request_count > 64:
+            raise RuntimeError("GDELT exceeded the 64-request safety limit while splitting saturated windows")
+
+        results = await fetcher.fetch_gdelt(
+            query=GDELT_QUERY,
+            max_records=250,
+            start_datetime=window_start.strftime("%Y%m%d%H%M%S"),
+            end_datetime=window_end.strftime("%Y%m%d%H%M%S"),
+        )
+        if len(results) < 250:
+            return results
+        if depth >= 16 or window_end - window_start <= timedelta(minutes=1):
+            raise RuntimeError("GDELT window remains saturated at its minimum supported interval")
+
+        midpoint = window_start + (window_end - window_start) / 2
+        # Overlap one second at the split and deduplicate URLs after collection.
+        overlap = timedelta(seconds=1)
+        left = await fetch_window(window_start, min(midpoint + overlap, window_end), depth + 1)
+        right = await fetch_window(max(midpoint - overlap, window_start), window_end, depth + 1)
+        return [*left, *right]
+
+    return await fetch_window(start, end)
+
+
 async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
-    """Fetch source data and write an auditable candidate without touching ``data/``."""
+    """Publish only a complete candidate; incomplete runs leave a report, not a snapshot."""
     candidate = _validate_candidate_path(output_dir)
-    raw_dir = candidate / "raw"
+    if candidate.exists():
+        raise ValueError(f"El destino ya existe; elige una ruta nueva para no sobrescribirlo: {candidate}")
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=f".{candidate.name}.", suffix=".partial", dir=candidate.parent))
+    raw_dir = stage / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=90)
-    start_gdelt = start.strftime("%Y%m%d%H%M%S")
-    end_gdelt = now.strftime("%Y%m%d%H%M%S")
     fetcher = LiveDataFetcher(timeout_seconds=15)
     source_errors: dict[str, str] = {}
 
@@ -70,19 +106,12 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
         tvn = []
         source_errors["tvn_rss"] = str(exc)
     try:
-        gdelt_batches = [
-            await fetcher.fetch_gdelt(
-                query=GDELT_QUERIES[0],
-                max_records=250,
-                start_datetime=start_gdelt,
-                end_datetime=end_gdelt,
-            )
-        ]
+        gdelt_articles = await _fetch_gdelt_complete(fetcher, start, now)
     except Exception as exc:
-        gdelt_batches = []
+        gdelt_articles = []
         source_errors["gdelt"] = str(exc)
     news_by_url: dict[str, dict[str, Any]] = {}
-    for article in [*tvn, *(item for batch in gdelt_batches for item in batch)]:
+    for article in [*tvn, *gdelt_articles]:
         url = str(article.get("url", "")).strip()
         if url:
             news_by_url.setdefault(url, article)
@@ -90,35 +119,12 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
 
     try:
         fetched_indicators = await fetcher.fetch_world_bank(
-            countries=list(COUNTRIES), indicators=list(INDICATORS), start_year=2010, end_year=2024
+            countries=list(COUNTRIES), indicators=list(INDICATORS), start_year=2010, end_year=2024, strict=True
         )
     except Exception as exc:
         fetched_indicators = []
         source_errors["world_bank"] = str(exc)
-    indicator_by_key = {
-        (str(row["pais_iso3"]), str(row["indicador_id"]), int(row["anio"])): row
-        for row in fetched_indicators
-        if row.get("anio") is not None
-    }
-    extraction_time = datetime.now(timezone.utc).isoformat()
-    indicators: list[dict[str, Any]] = []
-    for country in COUNTRIES:
-        for indicator in INDICATORS:
-            for year in INDICATOR_YEARS:
-                row = indicator_by_key.get((country, indicator, year))
-                if row is None:
-                    row = {
-                        "pais_iso3": country,
-                        "indicador_id": indicator,
-                        "anio": year,
-                        "valor": None,
-                        "unidad": "personas" if indicator == "SP.POP.TOTL" else "%",
-                        "fuente_url": (f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"),
-                        "fecha_extraccion": extraction_time,
-                        "licencia": "CC BY 4.0 (Banco Mundial)",
-                    }
-                indicators.append(row)
-    _write_csv(raw_dir / "indicadores.csv", INDICATOR_FIELDS, indicators)
+    _write_csv(raw_dir / "indicadores.csv", INDICATOR_FIELDS, fetched_indicators)
 
     try:
         usgs_events = await fetcher.fetch_usgs(
@@ -169,13 +175,21 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
         encoding="utf-8",
     )
 
-    LocalStorageRepository().generate_manifest(candidate)
-    report = audit_snapshot(candidate)
+    LocalStorageRepository().generate_manifest(stage)
+    report = audit_snapshot(stage)
     report["source_errors"] = source_errors
     report["ready"] = report["ready"] and not source_errors
-    (candidate / "audit-report.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-    )
+    if report["ready"]:
+        report["data_dir"] = str(candidate)
+        (stage / "audit-report.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+        os.replace(stage, candidate)
+    else:
+        shutil.rmtree(stage)
+        report["data_dir"] = str(candidate)
+        report_path = candidate.with_name(f"{candidate.name}.audit-report.json")
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
 
 
