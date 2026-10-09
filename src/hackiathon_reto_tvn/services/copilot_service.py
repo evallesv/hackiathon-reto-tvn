@@ -183,18 +183,26 @@ class CopilotService:
             live_rows = SQLiteStorage(self.settings.SQLITE_DB_PATH).get_latest_eventos(limit=100)
             merged: Dict[str, EventoGeoJSON] = {}
             for row in live_rows:
-                item = EventoGeoJSON(
-                    id=str(row.get("id") or ""),
-                    magnitude=float(row.get("magnitude") or 0.0),
-                    time=int(row.get("time") or 0),
-                    updated=int(row.get("updated") or 0),
-                    longitude=float(row.get("longitud") or 0.0),
-                    latitude=float(row.get("latitud") or 0.0),
-                    depth=float(row.get("profundidad") or 0.0),
-                    place=str(row.get("place") or ""),
-                    status=str(row.get("status") or ""),
-                    url=str(row.get("url") or ""),
-                )
+                try:
+                    item = EventoGeoJSON.model_validate(
+                        {
+                            "id": row.get("id"),
+                            "magnitude": row.get("magnitude"),
+                            "time": row.get("time"),
+                            "updated": row.get("updated"),
+                            "longitude": row.get("longitud"),
+                            "latitude": row.get("latitud"),
+                            "depth": row.get("profundidad"),
+                            "place": row.get("place"),
+                            "status": row.get("status"),
+                            "url": row.get("url"),
+                        }
+                    )
+                except ValueError:
+                    logger.warning(
+                        "Evento USGS vivo %s incompleto; excluido de consultas sin imputar valores.", row.get("id")
+                    )
+                    continue
                 merged[item.id] = item
             for event in events:
                 merged.setdefault(event.id, event)

@@ -429,3 +429,35 @@ async def test_live_fetcher_sync_all_mocked(tmp_path: Path) -> None:
         assert db_stats["total_indicadores"] == 1
         assert db_stats["total_eventos"] == 1
         assert db_stats["total_runs"] == 4
+
+
+@pytest.mark.asyncio
+async def test_usgs_fetch_preserves_missing_values_instead_of_inventing_zero_or_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"features": [{"id": "incomplete", "properties": {}, "geometry": {}}]}
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+    [record] = await LiveDataFetcher().fetch_usgs()
+
+    for field in ("magnitude", "time", "updated", "longitud", "latitud", "profundidad", "place", "status"):
+        assert record[field] is None

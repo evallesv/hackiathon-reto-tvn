@@ -23,3 +23,10 @@ El benchmark y sus etiquetas permanecen fuera de la base de evidencia. La base d
 ## Conformidad con el reto
 
 Implementa el almacenamiento de la arquitectura mínima de la sección 8, mejora la reproducibilidad offline T10 y entrega un artefacto con hash y metadatos como solicita la sección 10. La separación de benchmark preserva la evaluación de desarrollo y evita presentar el snapshot como entrenamiento supervisado.
+# Corrección de integridad USGS (2026-10-09)
+
+El contrato actual de eventos exige campos numéricos no nulos. Al empaquetar la base operativa,
+un evento incompatible se rechaza con su ID y el motivo antes de publicar el paquete; no se
+imputan ceros ni se publica silenciosamente un corpus parcial. Los loaders de consulta excluyen
+features inválidas con diagnóstico y continúan con las válidas. El dato operativo nulo se conserva
+en su base. Admitir eventos parciales en el modelo requiere ampliar explícitamente el contrato.

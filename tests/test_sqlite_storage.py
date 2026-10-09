@@ -123,3 +123,11 @@ def test_sqlite_storage_upsert_indicadores_and_eventos(tmp_path: Path) -> None:
     runs = storage.get_latest_runs(limit=5)
     assert len(runs) == 1
     assert runs[0]["estado"] == "SUCCESS"
+
+
+def test_usgs_storage_preserves_real_zero_updated_timestamp(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "zero.db")
+    storage.init_db()
+    storage.upsert_eventos([{"id": "zero-update", "magnitude": 3.0, "place": "Panama", "time": 1, "updated": 0}])
+
+    assert storage.get_latest_eventos()[0]["updated"] == 0

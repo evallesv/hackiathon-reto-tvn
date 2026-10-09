@@ -383,7 +383,7 @@ class LiveDataFetcher:
         for feat in features:
             props = feat.get("properties", {})
             geom = feat.get("geometry", {})
-            coords = geom.get("coordinates", [0.0, 0.0, 0.0])
+            coords = geom.get("coordinates") or []
 
             lon = coords[0] if len(coords) > 0 else None
             lat = coords[1] if len(coords) > 1 else None
@@ -392,15 +392,15 @@ class LiveDataFetcher:
             records.append(
                 {
                     "id": feat.get("id") or props.get("code", ""),
-                    "magnitude": float(props.get("mag", 0.0)),
-                    "place": props.get("place", "Región Panamá"),
-                    "time": props.get("time", 0),
+                    "magnitude": float(props["mag"]) if props.get("mag") is not None else None,
+                    "place": props.get("place"),
+                    "time": props.get("time"),
                     "updated": props.get("updated"),
                     "url": props.get("url", ""),
                     "latitud": lat,
                     "longitud": lon,
                     "profundidad": depth,
-                    "status": props.get("status", "reviewed"),
+                    "status": props.get("status"),
                 }
             )
 

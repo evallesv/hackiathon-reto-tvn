@@ -239,3 +239,80 @@ def test_sqlite_snapshot_merges_recent_local_ingestion_without_review_state(tmp_
         assert connection.execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM eventos_vivos").fetchone()[0] == 1
     assert not snapshot.has_table("fichas_casos")
+
+
+@pytest.mark.parametrize("null_field", ["updated", "longitud", "latitud", "profundidad", "url", "status"])
+def test_sqlite_snapshot_refuses_incompatible_usgs_nulls_without_publishing_a_partial_package(
+    tmp_path: Path, null_field: str
+) -> None:
+    source = tmp_path / "source"
+    _create_source_data(source)
+    frozen_inputs = {path: path.read_bytes() for path in (source / "raw").iterdir()}
+    frozen_inputs[source / "manifest.json"] = (source / "manifest.json").read_bytes()
+    operational_path = tmp_path / "operational.db"
+    operational = SQLiteStorage(operational_path)
+    operational.init_db()
+    complete = {
+        "id": "USGS-COMPLETE",
+        "magnitude": 4.5,
+        "time": 1720000000000,
+        "updated": 1720000001000,
+        "longitud": -80.0,
+        "latitud": 8.0,
+        "profundidad": 11.0,
+        "place": "Panama region",
+        "url": "https://earthquake.usgs.gov/event/complete",
+        "status": "reviewed",
+    }
+    incomplete = {**complete, "id": "USGS-INCOMPLETE", null_field: None}
+    operational.upsert_eventos([complete, incomplete])
+    snapshot_dir = tmp_path / "snapshot"
+
+    with pytest.raises(ValueError, match="USGS-INCOMPLETE.*EventoGeoJSON"):
+        SQLiteSnapshotRepository.create_from_directory(source, snapshot_dir, operational_db_path=operational_path)
+
+    assert not snapshot_dir.exists()
+    assert list(tmp_path.glob(".snapshot.*.partial")) == []
+    assert all(path.read_bytes() == original for path, original in frozen_inputs.items())
+
+
+def test_sqlite_snapshot_preserves_real_usgs_numeric_zeros(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    _create_source_data(source)
+    operational_path = tmp_path / "operational.db"
+    operational = SQLiteStorage(operational_path)
+    operational.init_db()
+    # Write the stored observation directly: this test isolates snapshot conversion from live ingestion.
+    with operational.get_connection() as connection:
+        connection.execute(
+            "INSERT INTO eventos_live "
+            "(id, magnitude, time, updated, longitud, latitud, profundidad, place, status, url, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "USGS-ZERO",
+                0.0,
+                0,
+                0,
+                0.0,
+                0.0,
+                0.0,
+                "Origen de coordenadas",
+                "reviewed",
+                "https://usgs.gov/zero",
+                "2026-10-09",
+            ),
+        )
+
+    snapshot = SQLiteSnapshotRepository.create_from_directory(
+        source, tmp_path / "snapshot", operational_db_path=operational_path
+    )
+
+    event = next(item for item in snapshot.load_eventos() if item.id == "USGS-ZERO")
+    assert (event.magnitude, event.time, event.updated, event.longitude, event.latitude, event.depth) == (
+        0.0,
+        0,
+        0,
+        0.0,
+        0.0,
+        0.0,
+    )

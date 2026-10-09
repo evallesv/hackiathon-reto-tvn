@@ -260,7 +260,7 @@ class SQLiteStorage:
                     "magnitude": float(rec.get("magnitude", 0.0)),
                     "place": rec.get("place", "Región Panamá"),
                     "time": int(rec.get("time", 0)),
-                    "updated": int(rec.get("updated", 0)) if rec.get("updated") else None,
+                    "updated": int(rec["updated"]) if rec.get("updated") is not None else None,
                     "url": rec.get("url", ""),
                     "latitud": float(rec.get("latitud", 0.0)) if rec.get("latitud") is not None else None,
                     "longitud": float(rec.get("longitud", 0.0)) if rec.get("longitud") is not None else None,

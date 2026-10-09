@@ -3,6 +3,9 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from hackiathon_reto_tvn.adapters.data.loaders import (
     EventGrouper,
@@ -45,6 +48,65 @@ def test_load_eventos_geojson() -> None:
     eventos = repo.load_eventos(Path("data/raw/eventos.geojson"))
     assert len(eventos) == 3
     assert eventos[0].magnitude >= 3.0
+
+
+def _usgs_feature(event_id: str) -> dict[str, Any]:
+    return {
+        "type": "Feature",
+        "id": event_id,
+        "properties": {
+            "mag": 4.2,
+            "time": 1720000000000,
+            "updated": 1720000001000,
+            "place": "Panama region",
+            "status": "reviewed",
+            "url": f"https://earthquake.usgs.gov/event/{event_id}",
+        },
+        "geometry": {"type": "Point", "coordinates": [-80.0, 8.0, 10.0]},
+    }
+
+
+@pytest.mark.parametrize("missing_field", ["mag", "time", "updated", "coordinates", "depth"])
+def test_usgs_loader_excludes_incomplete_features_without_imputing_zero(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, missing_field: str
+) -> None:
+    incomplete = _usgs_feature("USGS-INCOMPLETE")
+    if missing_field in {"mag", "time", "updated"}:
+        incomplete["properties"].pop(missing_field)
+    elif missing_field == "coordinates":
+        incomplete["geometry"].pop("coordinates")
+    else:
+        incomplete["geometry"]["coordinates"].pop()
+    path = tmp_path / "eventos.geojson"
+    path.write_text(
+        json.dumps({"type": "FeatureCollection", "features": [incomplete, _usgs_feature("USGS-COMPLETE")]}),
+        encoding="utf-8",
+    )
+
+    events = LocalStorageRepository().load_eventos(path)
+
+    assert [event.id for event in events] == ["USGS-COMPLETE"]
+    assert "USGS-INCOMPLETE" in caplog.text
+    assert "Error parsing feature" in caplog.text
+
+
+def test_usgs_loader_preserves_real_numeric_zeros(tmp_path: Path) -> None:
+    feature = _usgs_feature("USGS-ZERO")
+    feature["properties"].update(mag=0.0, time=0, updated=0)
+    feature["geometry"]["coordinates"] = [0.0, 0.0, 0.0]
+    path = tmp_path / "eventos.geojson"
+    path.write_text(json.dumps({"type": "FeatureCollection", "features": [feature]}), encoding="utf-8")
+
+    [event] = LocalStorageRepository().load_eventos(path)
+
+    assert (event.magnitude, event.time, event.updated, event.longitude, event.latitude, event.depth) == (
+        0.0,
+        0,
+        0,
+        0.0,
+        0.0,
+        0.0,
+    )
 
 
 def test_manifest_sha256_generation(tmp_path: Path) -> None:

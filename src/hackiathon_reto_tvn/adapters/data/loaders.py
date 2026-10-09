@@ -145,7 +145,7 @@ class LocalStorageRepository(BaseStorageRepository):
         return indicadores
 
     def load_eventos(self, path: Path) -> List[EventoGeoJSON]:
-        """Loads USGS eventos.geojson."""
+        """Load complete USGS events; diagnose incomplete features without inventing numeric values."""
         if not path.exists():
             return []
 
@@ -155,27 +155,32 @@ class LocalStorageRepository(BaseStorageRepository):
         eventos: List[EventoGeoJSON] = []
         features = data.get("features", [])
 
-        for feat in features:
+        for index, feat in enumerate(features):
+            feature_id = feat.get("id", "sin id") if isinstance(feat, dict) else "sin id"
             try:
-                props = feat.get("properties", {})
-                geom = feat.get("geometry", {})
-                coords = geom.get("coordinates", [0.0, 0.0, 0.0])
+                props = feat.get("properties") or {}
+                geom = feat.get("geometry") or {}
+                coords = geom.get("coordinates")
+                if not isinstance(coords, list) or len(coords) < 3:
+                    raise ValueError("coordinates debe contener longitud, latitud y profundidad explícitas")
 
-                evento = EventoGeoJSON(
-                    id=str(feat.get("id", "")),
-                    magnitude=float(props.get("mag", 0.0)),
-                    time=int(props.get("time", 0)),
-                    updated=int(props.get("updated", 0)),
-                    longitude=float(coords[0]),
-                    latitude=float(coords[1]),
-                    depth=float(coords[2]) if len(coords) > 2 else 0.0,
-                    place=str(props.get("place", "")),
-                    status=str(props.get("status", "")),
-                    url=str(props.get("url", "")),
+                evento = EventoGeoJSON.model_validate(
+                    {
+                        "id": str(feat.get("id", "")),
+                        "magnitude": props.get("mag"),
+                        "time": props.get("time"),
+                        "updated": props.get("updated"),
+                        "longitude": coords[0],
+                        "latitude": coords[1],
+                        "depth": coords[2],
+                        "place": str(props.get("place", "")),
+                        "status": str(props.get("status", "")),
+                        "url": str(props.get("url", "")),
+                    }
                 )
                 eventos.append(evento)
             except Exception as exc:
-                logger.error(f"Error parsing feature in {path}: {exc}")
+                logger.error("Error parsing feature %s (%s) in %s: %s", index, feature_id, path, exc)
 
         return eventos
 

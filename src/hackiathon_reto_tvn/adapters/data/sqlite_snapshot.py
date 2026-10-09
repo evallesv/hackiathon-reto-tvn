@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Generator
 
+from pydantic import ValidationError
+
 from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository
 from hackiathon_reto_tvn.domain.models import EventoGeoJSON, Indicador, Noticia
 from hackiathon_reto_tvn.domain.snapshot_contract import EXPECTED_INDICATOR_KEYS, INDICATOR_UNITS
@@ -315,23 +317,28 @@ def _read_recent_operational_records(
             continue
         noticias.append(Noticia.model_validate(item))
     indicadores = [Indicador.model_validate(dict(row)) for row in indicator_rows]
-    eventos = [
-        EventoGeoJSON.model_validate(
-            {
-                "id": row["id"],
-                "magnitude": row["magnitude"],
-                "time": row["time"],
-                "updated": row["updated"] or 0,
-                "longitude": row["longitud"] or 0.0,
-                "latitude": row["latitud"] or 0.0,
-                "depth": row["profundidad"] or 0.0,
-                "place": row["place"] or "",
-                "status": row["status"] or "",
-                "url": row["url"] or "",
-            }
-        )
-        for row in event_rows
-    ]
+    eventos: list[EventoGeoJSON] = []
+    for row in event_rows:
+        try:
+            evento = EventoGeoJSON.model_validate(
+                {
+                    "id": row["id"],
+                    "magnitude": row["magnitude"],
+                    "time": row["time"],
+                    "updated": row["updated"],
+                    "longitude": row["longitud"],
+                    "latitude": row["latitud"],
+                    "depth": row["profundidad"],
+                    "place": row["place"],
+                    "status": row["status"],
+                    "url": row["url"],
+                }
+            )
+        except ValidationError as exc:
+            raise ValueError(
+                f"No se puede publicar el snapshot: evento USGS '{row['id']}' incompatible con EventoGeoJSON: {exc}"
+            ) from exc
+        eventos.append(evento)
     canonical = {
         "noticias": [item.model_dump() for item in noticias],
         "indicadores": [item.model_dump() for item in indicadores],

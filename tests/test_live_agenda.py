@@ -139,6 +139,7 @@ async def test_editorial_query_uses_live_usgs_event(tmp_path: Path) -> None:
                 "magnitude": 4.8,
                 "place": "Golfo de Burica, Panamá",
                 "time": 1_800_000_000_000,
+                "updated": 1_800_000_001_000,
                 "url": "https://earthquake.usgs.gov/live-event",
                 "latitud": 7.0,
                 "longitud": -82.0,
@@ -152,6 +153,29 @@ async def test_editorial_query_uses_live_usgs_event(tmp_path: Path) -> None:
 
     assert "4.8" in response.respuesta
     assert response.citas[0]["id_fuente"] == "us7000m1a1-live"
+
+
+def test_live_query_excludes_incomplete_events_without_imputing_depth(tmp_path: Path) -> None:
+    service, storage = _service(tmp_path)
+    storage.upsert_eventos(
+        [
+            {
+                "id": "incomplete-event",
+                "magnitude": 4.8,
+                "place": "Burica",
+                "time": 1_800_000_000_000,
+                "updated": 1_800_000_001_000,
+                "longitud": -82.0,
+                "latitud": 7.0,
+                "profundidad": None,
+                "status": "reviewed",
+                "url": "https://example.com/event",
+            }
+        ]
+    )
+
+    assert "incomplete-event" not in {event.id for event in service.load_query_events()}
+    assert storage.get_latest_eventos()[0]["profundidad"] is None
 
 
 def test_agenda_restores_persisted_human_review_on_refresh(tmp_path: Path) -> None:
