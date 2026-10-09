@@ -8,12 +8,18 @@ from hackiathon_reto_tvn.adapters.decision.cloudflare_clef_adapter import Cloudf
 from hackiathon_reto_tvn.adapters.decision.factory import get_decision_client
 from hackiathon_reto_tvn.adapters.decision.jev_adapter import JevAdapter
 from hackiathon_reto_tvn.adapters.decision.mock_decision_adapter import MockDecisionAdapter
+from hackiathon_reto_tvn.adapters.llm.mock_adapter import MockLLMAdapter
 from hackiathon_reto_tvn.config import Settings
 from hackiathon_reto_tvn.ports.decision_port import (
+    ChoiceAnswer,
     ChoiceQuestion,
+    DecisionResult,
+    NoulAnswer,
     NoulQuestion,
+    ScoreAnswer,
     ScoreQuestion,
 )
+from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
 
 @pytest.mark.asyncio
@@ -252,3 +258,133 @@ def test_factory_transparent_fallback_and_selection() -> None:
     s5 = Settings(DECISION_PROVIDER="mock")
     client5 = get_decision_client(s5)
     assert isinstance(client5, MockDecisionAdapter)
+
+
+@pytest.mark.parametrize("provider", ["cloudflare", "jev"])
+@pytest.mark.parametrize(
+    "invalid_response",
+    [
+        "empty",
+        "missing_question",
+        "empty_answer",
+        "wrong_type",
+        "null_probability",
+        "null_score",
+        "empty_choice",
+        "null_choice",
+    ],
+)
+@pytest.mark.asyncio
+async def test_incomplete_provider_responses_fall_back_with_effective_attribution(
+    provider: str, invalid_response: str
+) -> None:
+    adapter = (
+        CloudflareClefAdapter("test-account", "test-token") if provider == "cloudflare" else JevAdapter("test-key")
+    )
+    questions = {
+        "discrepancia": NoulQuestion(instructions="¿Hay discrepancia?"),
+        "urgencia": ScoreQuestion(instructions="Urgencia"),
+        "tipo_afirmacion": ChoiceQuestion(instructions="Clasifica", options=["hecho", "declaracion"]),
+    }
+    answers = {
+        "discrepancia": {"probability": 0.1},
+        "urgencia": {"expected_score": 0.2},
+        "tipo_afirmacion": {"answer": "hecho", "confidence": 0.9},
+    }
+    if invalid_response == "empty":
+        answers = {}
+    elif invalid_response == "missing_question":
+        answers.pop("urgencia")
+    elif invalid_response == "empty_answer":
+        answers["discrepancia"] = {}
+    elif invalid_response == "wrong_type":
+        answers["discrepancia"] = {"expected_score": 0.0}
+    elif invalid_response == "null_probability":
+        answers["discrepancia"] = {"probability": None} if provider == "cloudflare" else {"noul": None}
+    elif invalid_response == "null_score":
+        answers["urgencia"] = {"expected_score": None} if provider == "cloudflare" else {"score": None}
+    elif invalid_response == "empty_choice":
+        answers["tipo_afirmacion"] = {"answer": "", "confidence": 0.9}
+    else:
+        answers["tipo_afirmacion"] = {"answer": None, "confidence": 0.9}
+    payload = {"success": True, "result": {"answers": answers}} if provider == "cloudflare" else {"answers": answers}
+
+    with patch("httpx.AsyncClient.post") as mock_post:
+        response = MagicMock()
+        response.json.return_value = payload
+        response.raise_for_status.return_value = None
+        mock_post.return_value = response
+        result = await adapter.decide("Versión A: 15 millones\nVersión B: 28 millones", questions)
+
+    assert result.provider_name == "mock"
+    assert result.model_name.endswith("-offline-fallback")
+    assert result.get_noul("discrepancia") == 0.95
+    assert isinstance(result.answers["urgencia"], ScoreAnswer)
+    assert isinstance(result.answers["tipo_afirmacion"], ChoiceAnswer)
+
+
+@pytest.mark.parametrize("provider", ["cloudflare", "jev"])
+@pytest.mark.asyncio
+async def test_provider_responses_preserve_legitimate_zero_probabilities_and_scores(provider: str) -> None:
+    adapter = (
+        CloudflareClefAdapter("test-account", "test-token") if provider == "cloudflare" else JevAdapter("test-key")
+    )
+    answers = (
+        {"discrepancia": {"probability": 0.0}, "urgencia": {"expected_score": 0.0}}
+        if provider == "cloudflare"
+        else {"discrepancia": {"noul": 0.0}, "urgencia": {"score": 0.0}}
+    )
+    payload = {"success": True, "result": {"answers": answers}} if provider == "cloudflare" else {"answers": answers}
+
+    with patch("httpx.AsyncClient.post") as mock_post:
+        response = MagicMock()
+        response.json.return_value = payload
+        response.raise_for_status.return_value = None
+        mock_post.return_value = response
+        result = await adapter.decide(
+            "Versiones compatibles",
+            {
+                "discrepancia": NoulQuestion(instructions="Discrepancia"),
+                "urgencia": ScoreQuestion(instructions="Urgencia"),
+            },
+        )
+
+    assert result.provider_name == provider
+    assert result.get_noul("discrepancia") == 0.0
+    assert result.get_score("urgencia") == 0.0
+
+
+@pytest.mark.parametrize("answer", [None, ChoiceAnswer(answer=""), ScoreAnswer(expected_score=0.0)])
+@pytest.mark.asyncio
+async def test_contradiction_service_rejects_missing_or_wrong_answer_types(answer: object) -> None:
+    class InvalidDecisionClient(MockDecisionAdapter):
+        async def decide(self, state, questions):
+            answers = {} if answer is None else {"discrepancia": answer}
+            return DecisionResult(answers=answers, provider_name="invalid-client", model_name="incomplete")
+
+    service = CopilotService(
+        settings=Settings(_env_file=None, ENVIRONMENT="test", LLM_PROVIDER="mock", DECISION_PROVIDER="mock"),
+        llm_client=MockLLMAdapter(),
+        decision_client=InvalidDecisionClient(),
+    )
+
+    with pytest.raises(ValueError, match="discrepancia.*NoulAnswer"):
+        await service.detect_contradictions("La obra cuesta 15 millones", "La obra cuesta 28 millones")
+
+
+@pytest.mark.asyncio
+async def test_contradiction_service_accepts_explicit_zero_probability() -> None:
+    class ZeroDecisionClient(MockDecisionAdapter):
+        async def decide(self, state, questions):
+            return DecisionResult(answers={"discrepancia": NoulAnswer(probability=0.0)}, provider_name="mock")
+
+    service = CopilotService(
+        settings=Settings(_env_file=None, ENVIRONMENT="test", LLM_PROVIDER="mock", DECISION_PROVIDER="mock"),
+        llm_client=MockLLMAdapter(),
+        decision_client=ZeroDecisionClient(),
+    )
+
+    result = await service.detect_contradictions("La obra cuesta 15 millones", "La obra cuesta 15 millones")
+
+    assert result["probabilidad_discrepancia"] == 0.0
+    assert result["estado"] == "consistente"

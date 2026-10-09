@@ -4,6 +4,7 @@ Implements System One decision model over Cloudflare Workers AI REST API.
 """
 
 import logging
+import math
 from collections.abc import Mapping
 from typing import Any, Dict, Union
 
@@ -74,7 +75,9 @@ class CloudflareClefAdapter(BaseDecisionClient):
                 response = await client.post(self.endpoint_url, json=payload, headers=headers)
                 response.raise_for_status()
                 data = response.json()
-            return self._parse_response(data)
+            result = self._parse_response(data)
+            self._validate_requested_answers(result, questions)
+            return result
         except Exception as exc:
             logger.warning(
                 f"Error calling Cloudflare Clef API ({self.model}): {exc}. "
@@ -116,6 +119,26 @@ class CloudflareClefAdapter(BaseDecisionClient):
                 serialized[q_id] = q_def.model_dump()
         return serialized
 
+    @staticmethod
+    def _validate_requested_answers(result: DecisionResult, questions: Mapping[str, QuestionDefinition]) -> None:
+        """Require a usable answer of the requested type before attributing provider success."""
+        for key, question in questions.items():
+            answer = result.answers.get(key)
+            valid_type = (
+                isinstance(question, NoulQuestion)
+                and isinstance(answer, NoulAnswer)
+                or isinstance(question, ChoiceQuestion)
+                and isinstance(answer, ChoiceAnswer)
+                or isinstance(question, ScoreQuestion)
+                and isinstance(answer, ScoreAnswer)
+            )
+            if not valid_type:
+                raise ValueError(f"Respuesta ausente o de tipo incompatible para la pregunta '{key}'.")
+            if isinstance(answer, ChoiceAnswer) and not answer.answer.strip():
+                raise ValueError(f"Respuesta de clasificación vacía para la pregunta '{key}'.")
+            if isinstance(answer, ScoreAnswer) and not math.isfinite(answer.expected_score):
+                raise ValueError(f"Puntaje no finito para la pregunta '{key}'.")
+
     def _parse_response(self, data: Dict[str, Any]) -> DecisionResult:
         """Parses Cloudflare response envelope result.answers."""
         result_body = data.get("result", {})
@@ -132,7 +155,9 @@ class CloudflareClefAdapter(BaseDecisionClient):
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},
                 )
             elif "confidence" in ans_data or ("probabilities" in ans_data and "probability" not in ans_data):
-                raw_ans = str(ans_data.get("answer", ""))
+                raw_ans = ans_data.get("answer")
+                if not isinstance(raw_ans, str):
+                    raise ValueError(f"Respuesta de clasificación inválida para '{key}'.")
                 parsed_answers[key] = ChoiceAnswer(
                     answer=raw_ans,
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},

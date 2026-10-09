@@ -26,6 +26,7 @@ from hackiathon_reto_tvn.domain.models import (
     TipoAfirmacion,
 )
 from hackiathon_reto_tvn.domain.safety import SafetyGuard
+from hackiathon_reto_tvn.ports.decision_port import ChoiceAnswer, DecisionResult, ScoreAnswer
 from hackiathon_reto_tvn.ports.llm_port import BaseLLMClient
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
@@ -143,6 +144,37 @@ def test_frozen_corpus_flags_only_the_genuinely_old_article() -> None:
     noticias = LocalStorageRepository().load_noticias(Path("data/raw/noticias.csv"))
     flagged = {n.id_noticia for n in noticias if EventGrouper.detect_recirculated(n)[0]}
     assert flagged == {"NOT-009"}
+
+
+@pytest.mark.asyncio
+async def test_injected_source_cannot_become_publishable_even_with_high_decision_scores(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = CopilotService(settings=Settings(_env_file=None, ENVIRONMENT="test"))
+    malicious = next(item for item in service.load_query_news() if item.id_noticia == "NOT-010")
+    monkeypatch.setattr(service, "load_agenda_corpus", lambda: ([malicious], "snapshot_congelado"))
+
+    async def high_scores(**_: object) -> DecisionResult:
+        return DecisionResult(
+            answers={
+                **{key: ScoreAnswer(expected_score=1.0) for key in ("relevancia", "impacto", "urgencia", "novedad")},
+                "tipo_afirmacion": ChoiceAnswer(answer="hecho"),
+            },
+            provider_name="mock",
+            model_name="controlled-high-scores",
+        )
+
+    monkeypatch.setattr(service.decision_client, "decide", high_scores)
+    [case] = await service.prioritize_agenda_async(top_n=1)
+
+    assert case.puntaje >= 70.0
+    assert case.estado_evidencia == EstadoEvidencia.INSUFICIENTE
+    assert case.componentes.evidencia_disponible == 0.0
+    assert case.afirmaciones == []
+    assert case.ids_fuente == ["NOT-010"]
+    assert case.citas[0].texto_sustento == malicious.titulo
+    with pytest.raises(ValueError, match="evidencia insuficiente"):
+        await service.generate_tvn_editorial_package(case)
 
 
 # --- Citation coverage + human-in-the-loop ----------------------------------------------------------------

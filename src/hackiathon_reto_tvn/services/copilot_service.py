@@ -39,6 +39,7 @@ from hackiathon_reto_tvn.domain.scoring import ScoringEngine
 from hackiathon_reto_tvn.ports.decision_port import (
     BaseDecisionClient,
     ChoiceQuestion,
+    NoulAnswer,
     NoulQuestion,
     QuestionDefinition,
     ScoreQuestion,
@@ -232,7 +233,10 @@ class CopilotService:
 
         async def _evaluate_cluster(cluster_idx: int, cluster_key: str, cluster_items: List[Noticia]) -> FichaCaso:
             async with semaphore:
-                lead_art = cluster_items[0]
+                usable_items = [
+                    article for article in cluster_items if not SafetyGuard.sanitize_untrusted_text(article.titulo)[1]
+                ]
+                lead_art = usable_items[0] if usable_items else cluster_items[0]
                 recirculated, _ = EventGrouper.detect_recirculated(lead_art)
                 fecha_efectiva = self._parse_source_datetime(lead_art.fecha_publicacion) or self._parse_source_datetime(
                     lead_art.fecha_deteccion
@@ -281,7 +285,8 @@ class CopilotService:
 
                 # Publisher count alone cannot establish independent provenance or official corroboration.
                 # Until source lineage is represented in the data contract, count one verified provenance group.
-                evidencia_disp = 0.40
+                # A quarantined instruction payload is not usable evidence for a news claim.
+                evidencia_disp = 0.40 if usable_items else 0.0
 
                 componentes = ComponentesPuntaje(
                     relevancia=relevancia,
@@ -293,7 +298,7 @@ class CopilotService:
 
                 puntaje = ScoringEngine.calculate_score(componentes)
                 estado_evidencia = ScoringEngine.evaluate_evidence_state(
-                    num_fuentes_primarias=1,
+                    num_fuentes_primarias=1 if usable_items else 0,
                     tiene_verificacion_cruzada=False,
                     tiene_datos_oficiales=False,
                 )
@@ -305,21 +310,26 @@ class CopilotService:
                     else (TipoAfirmacion.INFERENCIA if claim_choice == "inferencia" else TipoAfirmacion.HECHO)
                 )
 
-                afirmaciones = [
-                    Afirmacion(
-                        id_afirmacion=f"AF-{cluster_idx + 1:03d}-1",
-                        texto=lead_art.titulo,
-                        tipo=tipo_afirmacion,
-                        citas=[
-                            CitaEvidencia(
-                                id_fuente=lead_art.id_noticia,
-                                campo_o_pasaje="titulo",
-                                texto_sustento=lead_art.titulo,
-                                url_fuente=lead_art.url,
-                            )
-                        ],
+                citas = [
+                    CitaEvidencia(
+                        id_fuente=lead_art.id_noticia,
+                        campo_o_pasaje="titulo",
+                        texto_sustento=lead_art.titulo,
+                        url_fuente=lead_art.url,
                     )
                 ]
+                afirmaciones = (
+                    [
+                        Afirmacion(
+                            id_afirmacion=f"AF-{cluster_idx + 1:03d}-1",
+                            texto=lead_art.titulo,
+                            tipo=tipo_afirmacion,
+                            citas=citas,
+                        )
+                    ]
+                    if usable_items
+                    else []
+                )
 
                 return FichaCaso(
                     id_caso=(
@@ -330,7 +340,7 @@ class CopilotService:
                     modalidad=Modalidad.TVN_EDITORIAL,
                     ids_fuente=[a.id_noticia for a in cluster_items],
                     afirmaciones=afirmaciones,
-                    citas=[c for af in afirmaciones for c in af.citas],
+                    citas=citas,
                     puntaje=puntaje.valor_total,
                     componentes=componentes,
                     estado_evidencia=estado_evidencia,
@@ -397,7 +407,12 @@ class CopilotService:
             )
         }
         decision_res = await self.decision_client.decide(state=state_text, questions=questions)
-        prob = decision_res.get_noul("discrepancia", 0.0)
+        answer = decision_res.answers.get("discrepancia")
+        if not isinstance(answer, NoulAnswer):
+            raise ValueError(
+                "La decisión 'discrepancia' requiere un NoulAnswer válido; no se puede inferir consistencia."
+            )
+        prob = answer.probability
         discrepancia = prob >= 0.5
         return {
             "discrepancia_detectada": discrepancia,
