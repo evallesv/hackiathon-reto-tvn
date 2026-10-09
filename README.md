@@ -211,15 +211,18 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 80 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 92 tests Pytest)
 make check
+
+# Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
+make audit-snapshot SNAPSHOT_DIR=/private/tmp/snapshot-candidate
 ```
 
 ---
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **89 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **92 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
@@ -261,7 +264,7 @@ gh issue close 9
 ## 🚀 Despliegue Automatizado (CI/CD)
 
 El ciclo de integración y despliegue continuo se orquesta exclusivamente a través de **GitHub Actions**:
-* **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest con 80 pruebas de aceptación).
+* **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest).
 * **Pipeline de CD (`fly-deploy.yml`)**: Construye de forma automatizada la imagen contenedor multi-stage (`Dockerfile`) y realiza el despliegue ante cambios en la rama `main` o mediante ejecución manual con GitHub CLI (`gh workflow run fly-deploy.yml`).
 
 ### Arquitectura de Despliegue Agnóstica a la Nube
@@ -305,7 +308,7 @@ Para garantizar la estabilidad del servicio en producción (Fly.io) y facilitar 
    git push -u origin feat/<nombre-tarea>
    gh pr create --fill
    ```
-3. **Validación Previa (`make check`)**: Todo cambio debe pasar el gate completo (`ruff`, `mypy`, `pytest` 80/80) antes de solicitar revisión.
+3. **Validación Previa (`make check`)**: Todo cambio debe pasar el gate completo (`ruff`, `mypy` y pytest) antes de solicitar revisión.
 4. **Protección Local de Git**: Configure el hook pre-push ejecutando `make setup-hooks` para bloquear pushes accidentales a `main`.
 
 ---
