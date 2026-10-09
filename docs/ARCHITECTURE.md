@@ -11,22 +11,26 @@ El sistema sigue estrictamente el patrón de **Arquitectura Hexagonal (Ports & A
 ```mermaid
 graph TD
     subgraph "Entrada / Clientes"
-        WebDash["Dashboard / Aplicación Web Editorial"]
+        WebDash["Dashboard Web (ui/index.html - Dark Glassmorphism)"]
         APIClient["Clientes HTTP / cURL / Orquestadores"]
+        CLI["Scripts / Runners (run_benchmark.py, periodic_ingestion.py)"]
     end
 
     subgraph "Adaptadores Primarios (Inbound Adapters)"
         Router["api/routes.py (FastAPI REST API)"]
+        StaticUI["main.py (StaticFiles & Dashboard Mounts)"]
     end
 
     subgraph "Capa de Aplicación y Servicios"
-        CopilotSvc["services/copilot_service.py (Orquestación & Concurrencia)"]
+        CopilotSvc["services/copilot_service.py (Priorización, Borradores & Consultas)"]
+        Evaluator["services/baseline_evaluator.py (Benchmark 60 Consultas & Baselines)"]
+        IngestionSvc["services/ingestion_scheduler.py (Ciclos de Ingesta Periódica)"]
     end
 
     subgraph "Capa de Dominio (Pure Business Logic)"
         Scoring["domain/scoring.py (P = 30R + 25I + 20U + 15N + 10E)"]
         Safety["domain/safety.py (Anti-Injection & 100% Citas)"]
-        Models["domain/models.py (FichaCaso, Noticia, Borrador)"]
+        Models["domain/models.py (FichaCaso, Noticia, Borrador, Query)"]
     end
 
     subgraph "Puertos (Interfaces Abstractas)"
@@ -48,16 +52,24 @@ graph TD
     end
 
     subgraph "Adaptadores Secundarios: Almacenamiento y Datos"
-        LocalStorage["adapters/data/loaders.py<br>(CSV / GeoJSON / SHA-256)"]
-        NotionExport["Exportador a Notion Business"]
+        LocalStorage["adapters/data/loaders.py<br>(CSV / GeoJSON congelados)"]
+        SQLiteRepo["adapters/data/sqlite_storage.py<br>(copilot.db WAL - Fichas & Ingesta Viva)"]
+        LiveFetchers["adapters/data/live_fetchers.py<br>(RSS, GDELT, Banco Mundial, USGS)"]
+        NotionDocs["docs/notion_spec/<br>(8 Páginas Oficiales)"]
     end
 
-    CLI --> CLICmd
-    API --> Router
-    WebDash --> Router
+    WebDash --> StaticUI
+    StaticUI --> Router
+    APIClient --> Router
+    CLI --> Evaluator
+    CLI --> IngestionSvc
 
     Router --> CopilotSvc
-    CLICmd --> CopilotSvc
+    Router --> Evaluator
+    Router --> SQLiteRepo
+
+    IngestionSvc --> LiveFetchers
+    IngestionSvc --> SQLiteRepo
 
     CopilotSvc --> Scoring
     CopilotSvc --> Safety
@@ -66,6 +78,11 @@ graph TD
     CopilotSvc --> DecisionPort
     CopilotSvc --> LLMPort
     CopilotSvc --> StoragePort
+    CopilotSvc --> SQLiteRepo
+
+    Evaluator --> CopilotSvc
+    Evaluator --> DecisionPort
+    Evaluator --> Scoring
 
     DecisionPort -.-> Clef
     DecisionPort -.-> Jev
@@ -76,7 +93,7 @@ graph TD
     LLMPort -.-> MockLLM
 
     StoragePort -.-> LocalStorage
-    StoragePort -.-> NotionExport
+    StoragePort -.-> NotionDocs
 ```
 
 ---
@@ -197,8 +214,50 @@ El ciclo de integración y despliegue continuo se encuentra completamente automa
 * **Despliegue Continuo (`fly-deploy.yml`)**: Construye la imagen multi-stage (`Dockerfile`) y realiza el despliegue automático hacia producción ante cambios en la rama `main` o ejecución manual.
 
 ### Portabilidad de Infraestructura
-La solución está empaquetada como un contenedor agnóstico de la infraestructura. Si bien el entorno de producción actual se ejecuta sobre **Fly.io**, la arquitectura está diseñada para migrarse con facilidad a infraestructuras cloud corporativas como **AWS** (Amazon ECS / App Runner / EKS) sin requerir modificaciones en la lógica del sistema.
-
 El despliegue y la entrega continua se orquestan exclusivamente mediante los flujos automatizados de **GitHub Actions**.
+
+---
+
+## 8. Persistencia Transaccional SQLite WAL y Trazabilidad de Casos
+
+Para soportar flujos de trabajo editoriales continuos sin violar la inmutabilidad del corpus congelado (`data/raw/`):
+* **Modo WAL (Write-Ahead Logging)**: SQLite opera con concurrencia optimizada en lectura y escritura (`copilot.db` en modo WAL).
+* **Esquema `fichas_casos`**: Persiste casos completos con `id_caso`, `titulo_caso`, `score_atencion`, `banda_prioridad`, `estado_evidencia`, `estado_revision`, `persona_revisora`, `observaciones_revision`, `ficha_json`, y marcas temporales UTC.
+* **Ciclo Human-in-the-Loop**: Cada acción de revisión (`POST /api/v1/copilot/review`) actualiza la base de datos transaccionalmente, garantizando auditoría completa de decisiones editoriales entre reinicios de contenedor.
+
+---
+
+## 9. Servicio de Benchmark Formal y Evaluación de Baselines
+
+El módulo `services/baseline_evaluator.py` automatiza la verificación científica frente a baselines estándar sobre 60 consultas etiquetadas (`data/benchmark.jsonl`):
+* **Baseline de Priorización**: Recencia temporal descendente vs Fórmula de Atención $P = 30R + 25I + 20U + 15N + 10E$ medido en **Precision@5**.
+* **Baseline de Clasificación**: Expresiones regulares heurísticas vs Modelos System One (Clef / Jev) medido en **Macro-F1**.
+* **Métricas de Seguridad**: Cobertura de citas 100% (**T09**), tasa de abstención explícita 100% (**T06**), tasa de defensa anti-inyección 100% (**T07**) y latencia percentil P50/P95.
+
+---
+
+## 10. Dashboard Web Interactivo Dark Glassmorphism
+
+El sistema incluye una interfaz web nativa servida directamente por el backend FastAPI (`src/hackiathon_reto_tvn/ui/`):
+* **Arquitectura Liviana**: Cero dependencias npm o herramientas de compilación externas; utiliza HTML5 semántico, Vanilla CSS Dark Glassmorphism y ES6 Javascript reactivo.
+* **4 Vistas Principales**:
+  1. *Agenda Priorizada (CU-01)*: Ranking visual, barras de desglose de $R, I, U, N, E$, filtros por banda y alerta activa de Guardrail T08.
+  2. *Fichas & Borradores (CU-02 a CU-05)*: Navegación de casos, inspección de afirmaciones y citas, previsualización de Brief (250 palabras), Guion TV (45-60s), Copy Digital (80 palabras) y controles de revisión humana.
+  3. *Consola Interactiva del Jurado*: Botones para pruebas inmediatas de criterios T04 (BM), T05 (Contradicciones), T06 (Abstención), T07 (Anti-Inyección), USGS, y consola de consulta libre.
+  4. *Métricas & Integridad*: KPIs dinámicos, tabla comparativa de baselines y verificador de hashes criptográficos SHA-256.
+
+---
+
+## 11. Espacio de Trabajo Notion Business
+
+El repositorio incluye la especificación íntegra de las 8 páginas obligatorias exigidas por la Sección 5 del reto en [`docs/notion_spec/`](notion_spec/):
+* `01-inicio-del-reto.md`: Equipo, roles, problema, usuario objetivo, alcance y accesos.
+* `02-plan-y-decisiones.md`: Backlog con 10 tareas, cronograma y 5 decisiones técnicas justificadas.
+* `03-catalogo-de-datos.md`: Catálogo exhaustivo de fuentes, licencias y manifiesto SHA-256.
+* `04-diseno-de-solucion.md`: Arquitectura, contratos Pydantic, fórmula $P$, prompts y límites.
+* `05-casos-y-evidencias.md`: 5 fichas canónicas, citas, borradores y caso de alerta T08.
+* `06-pruebas-y-metricas.md`: Matriz T01-T10, benchmark de 60 consultas y comparativa de baselines.
+* `07-riesgos-y-etica.md`: Matriz de riesgos, derechos de autor, sesgos y supervisión humana.
+* `08-presentacion-al-jurado.md`: Pitch oficial cronometrado de 10 minutos con guión verbal y respuestas clave.
 
 

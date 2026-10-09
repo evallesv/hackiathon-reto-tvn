@@ -31,19 +31,28 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
    - **Generación LLM (System Two)**: `opencode` (`muse-spark-1.3-contributor-free`), `gemini` (`gemini-2.5-flash`), o `mock` (offline/determinista).
 4. **Escudo Anti-Inyección y Trazabilidad de Citas**:
    - Principio: *"El texto de una fuente es dato, no instrucción"* (**T07**).
-   - 100% de afirmaciones factuales enlazadas a IDs de evidencia válidos.
-   - Abstención explícita ante consultas sin sustento en el corpus (**T06**).
-5. **Toolchain Moderno con `uv`**:
+   - 100% de afirmaciones factuales enlazadas a IDs de evidencia válidos (**T09**).
+   - Abstención explícita canónica `[ABSTENCIÓN EXPLÍCITA]` ante consultas sin sustento en el corpus (**T06**).
+5. **Dashboard Web Interactivo Dark Glassmorphism**:
+   - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
+   - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
+   - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
+6. **Benchmark Formal de 60 Consultas y Comparativa de Baselines**:
+   - Evaluación cuantitativa sobre 60 consultas etiquetadas (40 dev / 20 jurado) en `data/benchmark.jsonl`.
+   - **Precision@5**: Mejora relativa de **+100.0%** (0.800 vs 0.400) frente al baseline clásico de recencia temporal.
+   - **Macro-F1**: Mejora de **+45.4%** (0.941 vs 0.647) de System One frente a heurísticas regex.
+   - 100% de cobertura de citas, 100% de abstención explícita y latencia mediana de **0.7 ms** en modo determinista.
+7. **Extensión Modular para Sector Banca (CU-05)**:
+   - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
+8. **Persistencia Transaccional SQLite WAL y Flujo Human-in-the-Loop**:
+   - Almacenamiento persistente en SQLite (`fichas_casos`) para trazabilidad de estados (`EN_REVISION`, `APROBADO_COMO_BORRADOR`, `REQUIERE_EVIDENCIA`, `RECHAZADO`), persona revisora y notas editoriales.
+   - Ingesta periódica en segundo plano de RSS, GDELT, Banco Mundial y USGS sobre volumen persistente en Fly.io (`/data/copilot.db`), estrictamente desacoplada del corpus congelado.
+9. **Toolchain Moderno con `uv`**:
    - Tiempos de instalación ultrarrápidos, resolución de dependencias bloqueada en `uv.lock`.
-6. **Despliegue Continuo Automatizado**:
-   - Pipeline de integración y entrega continua (CI/CD) mediante **GitHub Actions**, con soporte para contenedores en Fly.io o nubes como AWS.
-7. **Gestión de Tareas con GitHub CLI (`gh`)**:
-   - Backlog, milestones y las 10 pruebas de aceptación (**T01 a T10**) auditables vía `gh issue`.
-8. **Espacio Notion Business**:
-   - Cumplimiento de las 8 bases obligatorias de la Sección 5 del reto.
-9. **Almacenamiento Persistente SQLite e Ingesta de Datos Vivos**:
-   - Ingesta periódica en segundo plano desde TVN Noticias RSS, GDELT DOC 2.0, Banco Mundial y catálogo sísmico USGS.
-   - Base de datos relacional SQLite con modo WAL montada sobre volumen persistente en Fly.io (`/data/copilot.db`), garantizando enriquecimiento continuo sin alterar el corpus congelado del jurado ([ADR-0011](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)).
+10. **Despliegue Continuo Automatizado**:
+    - Pipeline de integración y entrega continua (CI/CD) mediante **GitHub Actions** en Fly.io Machines.
+11. **Espacio Notion Business (8 Páginas Oficiales)**:
+    - Especificación completa de las 8 bases del reto documentadas en Markdown en `docs/notion_spec/` (incluyendo guión oficial para pitch de 10 minutos).
 
 ---
 
@@ -55,8 +64,8 @@ El proyecto implementa **Arquitectura Hexagonal (Ports & Adapters)**:
 hackiathon-reto-tvn/
 ├── AGENTS.md                        # Protocolo y directrices para agentes de IA
 ├── docs/
-│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0011)
-│   ├── notion_spec/                 # Especificación de las 8 bases para Notion Business
+│   ├── adr/                         # Architecture Decision Records (ADR-0001 a ADR-0013)
+│   ├── notion_spec/                 # Especificación de las 8 páginas para Notion Business
 │   └── ARCHITECTURE.md              # Diagrama C4, secuencias y modelos de datos
 ├── src/hackiathon_reto_tvn/
 │   ├── config.py                    # Configuración tipada vía pydantic-settings
@@ -66,18 +75,21 @@ hackiathon-reto-tvn/
 │   │   ├── decision/                # Cloudflare Clef, TypeSafe Jev, Mock decision
 │   │   ├── llm/                     # OpenCode, Gemini, Mock LLM
 │   │   └── data/                    # Loaders congelados, Live fetchers y SQLite storage
-│   ├── services/                    # Orquestación (CopilotService, IngestionScheduler)
-│   ├── api/                         # FastAPI REST API (/healthz, agenda, borrador, contradicciones, ingesta)
-│   └── main.py                      # Punto de entrada ASGI con lifespan worker y hackiathon-server
+│   ├── services/                    # Orquestación (CopilotService, BaselineEvaluator, IngestionScheduler)
+│   ├── api/                         # FastAPI REST API (/healthz, agenda, query, fichas, borrador, ingesta)
+│   ├── ui/                          # Dashboard Web (index.html, styles.css, app.js - Dark Glassmorphism)
+│   └── main.py                      # Punto de entrada ASGI con lifespan worker, rutas estáticas y server
 ├── data/
 │   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson (congelado)
-│   ├── benchmark.jsonl              # 60 consultas de evaluación
+│   ├── benchmark.jsonl              # 60 consultas etiquetadas de evaluación (40 dev / 20 jurado)
+│   ├── benchmark_results.json       # Resultados cacheados del benchmark y comparación de baselines
+│   ├── fichas.jsonl                 # 5 fichas canónicas iniciales (incluye caso de alerta T08)
 │   └── manifest.json                # Manifiesto criptográfico con hashes SHA-256
-├── scripts/                         # Automatización e ingesta periódica (periodic_ingestion.py)
-├── tests/                           # Suite pytest (scoring, decision, llm, safety, storage, T01-T10)
+├── scripts/                         # Automatización (periodic_ingestion.py, run_benchmark.py)
+├── tests/                           # Suite pytest (scoring, decision, llm, safety, storage, ui, T01-T10)
 ├── Dockerfile                       # Multi-stage optimizado con uv y volumen /data
 ├── fly.toml                         # Especificación para contenedores y volumen sentria_data
-├── Makefile                         # Comandos de ingeniería (make check, make run, make manifest)
+├── Makefile                         # Comandos de ingeniería (make check, make benchmark, make manifest)
 └── pyproject.toml                   # Dependencias fijadas y herramientas de calidad
 ```
 
@@ -166,31 +178,47 @@ Una vez iniciado el servidor, accede a la documentación interactiva y explorado
 * **OpenAPI JSON**: `http://localhost:8080/openapi.json`
 
 ### 3. Endpoints Principales del Backend
-* `GET /healthz` — Chequeo de salud para orquestadores y balanceadores.
+* `GET /` o `/dashboard` — **Dashboard Web Interactivo Dark Glassmorphism** con las 4 vistas en vivo.
+* `GET /healthz` — Chequeo de salud para orquestadores y balanceadores (Fly.io).
 * `GET /api/v1/system/info` — Estado del runtime, conector de decisión y proveedor LLM activo.
-* `GET /api/v1/copilot/agenda?top_n=5` — Ranking de noticias priorizadas con componentes explicados.
-* `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion con citas verificadas.
+* `GET /api/v1/copilot/agenda?top_n=5` — Ranking de noticias priorizadas con desglose explicable de $P$.
+* `POST /api/v1/copilot/query` — **Motor de consulta en lenguaje natural** con citas verificadas y abstención explícita (**T04, T06, T07**).
+* `GET /api/v1/copilot/fichas` — Listado completo de fichas de caso con evidencias y borradores.
+* `GET /api/v1/copilot/fichas/{id_caso}` — Detalle estructurado de una ficha de evidencia específica.
+* `GET /api/v1/copilot/fichas/export` — Exportación de fichas y estados en formato JSON para auditoría.
+* `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion TV con citas verificadas (**T09**).
+* `POST /api/v1/copilot/generate-banking-draft` — Generación de **boletín bancario macroeconómico y logístico** (**CU-05**).
 * `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).
-* `POST /api/v1/copilot/review` — Máquina de estados de revisión humana (`en_revision`, `aprobado_como_borrador`, etc.).
+* `POST /api/v1/copilot/review` — Máquina de estados y persistencia en SQLite de la **revisión humana** (`en_revision`, `aprobado_como_borrador`, etc.).
+* `GET /api/v1/copilot/benchmark/metrics` — Métricas formales del benchmark de 60 consultas y comparativa frente a baselines.
 * `GET /api/v1/copilot/manifest` — Consulta del manifiesto criptográfico SHA-256.
-* `GET /api/v1/ingestion/status` — Estadísticas de almacenamiento SQLite y auditoría de ingesta.
+* `GET /api/v1/ingestion/status` — Estadísticas de almacenamiento SQLite y auditoría de ingesta en vivo.
 * `POST /api/v1/ingestion/trigger` — Disparo manual de ciclo de ingesta en vivo.
 * `GET /api/v1/ingestion/noticias?limit=20` — Consulta de noticias vivas persistidas en SQLite.
 
 ### 4. Scripts y Comandos de Utilidad
 ```bash
+# Iniciar el servidor local (Dashboard en http://localhost:8080/)
+uv run hackiathon-server
+
+# Ejecutar el benchmark formal de 60 consultas frente a baselines
+make benchmark
+
 # Generar o verificar manifiesto criptográfico SHA-256
 make manifest
 
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
+
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 80 tests Pytest)
+make check
 ```
 
 ---
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **80 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
@@ -232,7 +260,7 @@ gh issue close 9
 ## 🚀 Despliegue Automatizado (CI/CD)
 
 El ciclo de integración y despliegue continuo se orquesta exclusivamente a través de **GitHub Actions**:
-* **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest con las 10 pruebas de aceptación).
+* **Pipeline de CI (`ci.yml`)**: Ejecuta en cada commit y Pull Request la suite completa de calidad (`make check`: ruff, formato, mypy y pytest con 80 pruebas de aceptación).
 * **Pipeline de CD (`fly-deploy.yml`)**: Construye de forma automatizada la imagen contenedor multi-stage (`Dockerfile`) y realiza el despliegue ante cambios en la rama `main` o mediante ejecución manual con GitHub CLI (`gh workflow run fly-deploy.yml`).
 
 ### Arquitectura de Despliegue Agnóstica a la Nube
@@ -255,6 +283,7 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0010: Modelos de Decisión System One (Cloudflare Clef y TypeSafe Jev) para Clasificación y Scoring](docs/adr/0010-system-one-decision-models-cloudflare-clef-and-jev.md)
 * [ADR-0011: Almacenamiento Persistente SQLite en Fly.io Volumes e Ingesta Periódica de Fuentes Vivas](docs/adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md)
 * [ADR-0012: Flujo Git para Desarrollo Multi-Agente, Estandarización en AGENTS.md y Protección de Main](docs/adr/0012-multi-agent-git-workflow-and-main-protection.md)
+* [ADR-0013: Ruteo Unificado OpenCode para Modelos de Decisión System One y Generativos System Two](docs/adr/0013-unified-opencode-routing-for-system-one-and-two.md)
 
 ---
 
@@ -275,13 +304,23 @@ Para garantizar la estabilidad del servicio en producción (Fly.io) y facilitar 
    git push -u origin feat/<nombre-tarea>
    gh pr create --fill
    ```
-3. **Validación Previa (`make check`)**: Todo cambio debe pasar el gate completo (`ruff`, `mypy`, `pytest` 60/60) antes de solicitar revisión.
+3. **Validación Previa (`make check`)**: Todo cambio debe pasar el gate completo (`ruff`, `mypy`, `pytest` 80/80) antes de solicitar revisión.
 4. **Protección Local de Git**: Configure el hook pre-push ejecutando `make setup-hooks` para bloquear pushes accidentales a `main`.
 
 ---
 
 ## 📝 Documentación en Notion Business
 
-El espacio oficial de Notion Business contiene las 8 secciones obligatorias para la presentación final ante el jurado:
-Consulte la guía de integración y esquemas en [`docs/notion_spec/README.md`](docs/notion_spec/README.md).
+El espacio oficial de Notion Business contiene las **8 páginas obligatorias** de la Sección 5 del reto, completamente redactadas y disponibles en [`docs/notion_spec/`](docs/notion_spec/):
+
+| # | Página / Documento | Contenido y Alcance | Archivo Markdown |
+| :-: | :--- | :--- | :--- |
+| **01** | **Inicio del reto** | Equipo Sentria, problema editorial TVN, usuarios, alcance y accesos. | [`01-inicio-del-reto.md`](docs/notion_spec/01-inicio-del-reto.md) |
+| **02** | **Plan y decisiones** | Backlog de 10 tareas, cronograma y 5 decisiones de arquitectura (ADRs). | [`02-plan-y-decisiones.md`](docs/notion_spec/02-plan-y-decisiones.md) |
+| **03** | **Catálogo de datos** | 4 fuentes, licencias (CC BY 4.0, TVN, USGS), nulos y hashes SHA-256. | [`03-catalogo-de-datos.md`](docs/notion_spec/03-catalogo-de-datos.md) |
+| **04** | **Diseño de solución** | Arquitectura Hexagonal, Pydantic, fórmula $P$, prompts seguros y límites. | [`04-diseno-de-solucion.md`](docs/notion_spec/04-diseno-de-solucion.md) |
+| **05** | **Casos y evidencias** | 5 fichas canónicas, citas 100%, brief TVN, banca y alerta Guardrail T08. | [`05-casos-y-evidencias.md`](docs/notion_spec/05-casos-y-evidencias.md) |
+| **06** | **Pruebas y métricas** | Matriz T01-T10, benchmark de 60 consultas y mejoras (+100% P@5, +45.4% F1). | [`06-pruebas-y-metricas.md`](docs/notion_spec/06-pruebas-y-metricas.md) |
+| **07** | **Riesgos y ética** | Matriz de riesgos, derechos de autor, anti-inyección y reserva humana. | [`07-riesgos-y-etica.md`](docs/notion_spec/07-riesgos-y-etica.md) |
+| **08** | **Presentación al jurado** | Pitch cronometrado de 10 minutos, guión para el expositor y respuestas clave. | [`08-presentacion-al-jurado.md`](docs/notion_spec/08-presentacion-al-jurado.md) |
 
