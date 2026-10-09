@@ -71,12 +71,15 @@ class MockLLMAdapter(BaseLLMClient):
             title_match = re.search(r"<title>(.*?)</title>", prompt, flags=re.DOTALL)
             if source_match is None or title_match is None:
                 raise ValueError("El modo mock requiere una fuente y un titular presentes en el caso.")
-            cited_id = source_match.group(1)
+            cited_id = html.unescape(source_match.group(1))
             source_title = html.unescape(title_match.group(1)).strip()
             supported_statement = source_title
             data = {
                 "titulo_propuesto": "Tema para verificación editorial",
-                "brief_250": f"{supported_statement}. No se dispone del artículo completo; los detalles requieren verificación.",
+                "brief_250": (
+                    f"basado únicamente en titular/metadatos. {supported_statement}. "
+                    "No se dispone del artículo completo; los detalles requieren verificación."
+                ),
                 "enfoque_interes_publico": "Verificar el alcance, contexto y consecuencias con fuentes directas.",
                 "preguntas_investigacion": [
                     "¿Cuál es el calendario oficial de mitigación presentado por las autoridades?",
@@ -125,12 +128,13 @@ class MockLLMAdapter(BaseLLMClient):
             title_match = re.search(r"<title>(.*?)</title>", prompt, flags=re.DOTALL)
             if source_match is None or title_match is None:
                 raise ValueError("El modo mock requiere una fuente y un titular presentes en el caso.")
-            cited_id = source_match.group(1)
+            cited_id = html.unescape(source_match.group(1))
             source_title = html.unescape(title_match.group(1)).strip()
             supported_statement = source_title
             data_bancaria = {
                 "resumen_250": (
-                    f"{supported_statement}. La evidencia disponible no demuestra por sí sola un impacto bancario o sectorial."
+                    f"basado únicamente en titular/metadatos. {supported_statement}. "
+                    "La evidencia disponible no demuestra por sí sola un impacto bancario o sectorial."
                 ),
                 "sectores_relacionados": [],
                 "horizonte_temporal": "No determinado por la evidencia disponible",

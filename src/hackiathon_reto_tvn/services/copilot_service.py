@@ -231,12 +231,11 @@ class CopilotService:
                 )
 
                 # Build typed decision questions for System One decision model (Clef / Jev)
-                state_text = (
-                    f"Titular: {lead_art.titulo}\n"
-                    f"Tema declarado: {lead_art.tema}\n"
-                    f"Medio: {lead_art.medio}\n"
-                    f"Origen: {lead_art.origen}\n"
-                    f"Alcance: {lead_art.alcance_texto}"
+                state_text = SafetyGuard.format_as_data_payload(
+                    lead_art.id_noticia,
+                    lead_art.titulo,
+                    f"Tema declarado: {lead_art.tema}\nMedio: {lead_art.medio}\n"
+                    f"Origen: {lead_art.origen}\nAlcance: {lead_art.alcance_texto}",
                 )
                 questions: Dict[str, QuestionDefinition] = {
                     "relevancia": ScoreQuestion(
@@ -442,6 +441,13 @@ class CopilotService:
         if length_violations:
             raise ValueError(f"Borrador rechazado por límite editorial: {'; '.join(length_violations)}")
 
+        self._require_factual_claims(borrador.afirmaciones)
+        if self._case_has_only_headline_evidence(caso) and (
+            not borrador.basado_unicamente_en_titular_metadatos
+            or "basado únicamente en titular/metadatos" not in borrador.brief_250
+        ):
+            raise ValueError("Borrador rechazado: la evidencia del caso requiere el rótulo titular/metadatos.")
+
         # Validate source identity, the quoted passage, and claim wording against case evidence.
         valid_sources = set(caso.ids_fuente)
         source_passages = self._case_source_passages(caso)
@@ -470,15 +476,36 @@ class CopilotService:
                 passages.setdefault(cita.id_fuente, []).append(cita.texto_sustento)
         return passages
 
+    @staticmethod
+    def _require_factual_claims(afirmaciones: List[Afirmacion]) -> None:
+        """A factual deliverable cannot bypass citation checks by declaring no factual claims."""
+        if not any(claim.tipo in (TipoAfirmacion.HECHO, TipoAfirmacion.DECLARACION) for claim in afirmaciones):
+            raise ValueError("Borrador rechazado: debe identificar al menos una afirmación factual con su evidencia.")
+
+    @staticmethod
+    def _case_has_only_headline_evidence(caso: FichaCaso) -> bool:
+        """Derive text scope from server-side citation fields, rather than a model's self-report."""
+        citations = [citation for claim in caso.afirmaciones for citation in claim.citas]
+        metadata_fields = {
+            "titulo",
+            "titular",
+            "title",
+            "medio",
+            "tema",
+            "origen",
+            "fecha_publicacion",
+            "fecha_deteccion",
+            "fecha_extraccion",
+            "alcance_texto",
+        }
+        return bool(citations) and all(citation.campo_o_pasaje in metadata_fields for citation in citations)
+
     def _format_claims_as_source_data(self, caso: FichaCaso) -> str:
         """Renders case claims as isolated untrusted <source_data> blocks (anti-injection shield)."""
         blocks: List[str] = []
         for af in caso.afirmaciones:
             source_id = af.citas[0].id_fuente if af.citas else caso.id_caso
-            if self.settings.PROMPT_INJECTION_SHIELD_ENABLED:
-                blocks.append(SafetyGuard.format_as_data_payload(source_id, title=af.texto, content=af.texto))
-            else:
-                blocks.append(f'<source_data id="{source_id}">{af.texto}</source_data>')
+            blocks.append(SafetyGuard.format_as_data_payload(source_id, title=af.texto, content=af.texto))
         return "\n".join(blocks)
 
     def update_human_review(
@@ -535,6 +562,13 @@ class CopilotService:
         length_violations = validate_banking_draft(borrador, self.settings.MAX_SUMMARY_WORDS_TVN_BRIEF)
         if length_violations:
             raise ValueError(f"Boletín rechazado por límite editorial: {'; '.join(length_violations)}")
+
+        self._require_factual_claims(borrador.afirmaciones)
+        if (
+            self._case_has_only_headline_evidence(caso)
+            and "basado únicamente en titular/metadatos" not in borrador.resumen_250
+        ):
+            raise ValueError("Boletín rechazado: la evidencia del caso requiere el rótulo titular/metadatos.")
 
         valid_sources = set(caso.ids_fuente)
         source_passages = self._case_source_passages(caso)
@@ -681,11 +715,9 @@ class CopilotService:
             "guatemala": "GTM",
             "gtm": "GTM",
         }
-        target_country = "PAN"
-        for cname, ciso in country_map.items():
-            if cname in q_lower:
-                target_country = ciso
-                break
+        requested_countries = {
+            ciso for cname, ciso in country_map.items() if re.search(rf"\b{re.escape(cname)}\b", q_lower)
+        }
 
         # Map indicator keywords
         indicator_keyword_map = [
@@ -704,24 +736,28 @@ class CopilotService:
                 target_indicator = ind_id
                 break
 
-        # Extract year if specified (default 2023)
-        year_match = re.search(r"\b(201\d|202\d)\b", q_lower)
-        target_year = int(year_match.group(1)) if year_match else 2023
+        requested_years = {int(year) for year in re.findall(r"\b((?:19|20)\d{2})\b", q_lower)}
 
         if target_indicator:
-            match = next(
-                (
-                    i
-                    for i in indicadores
-                    if i.pais_iso3 == target_country and i.indicador_id == target_indicator and i.anio == target_year
-                ),
-                None,
-            )
-            if not match and target_country == "PAN":
-                match = next(
-                    (i for i in indicadores if i.indicador_id == target_indicator and i.anio == target_year),
-                    None,
+            if len(requested_countries) != 1 or len(requested_years) > 1:
+                return QueryResponse(
+                    consulta=consulta,
+                    respuesta=SafetyGuard.format_explicit_abstention(
+                        consulta,
+                        "Esta consulta de indicadores requiere un solo país del catálogo y, opcionalmente, un año; "
+                        "no se sustituyen países ni se reducen comparaciones a una sola cifra",
+                    ),
+                    es_abstencion=True,
+                    citas=[],
                 )
+            target_country = next(iter(requested_countries))
+            candidates = [
+                item
+                for item in indicadores
+                if item.pais_iso3 == target_country and item.indicador_id == target_indicator and item.anio is not None
+            ]
+            target_year = next(iter(requested_years), max((item.anio or 0 for item in candidates), default=0))
+            match = next((item for item in candidates if item.anio == target_year), None)
 
             if match and match.valor is not None:
                 indicator_names = {
@@ -761,7 +797,8 @@ class CopilotService:
             else:
                 abstencion = SafetyGuard.format_explicit_abstention(
                     topic_or_query=consulta,
-                    missing_reason=f"No existen series oficiales registradas en el corpus para {target_country} en el año {target_year}",
+                    missing_reason=f"No existe un valor oficial disponible para {target_country}, "
+                    f"serie {target_indicator}, año {target_year or 'sin registros'}; los valores nulos no se imputan",
                 )
                 return QueryResponse(
                     consulta=consulta,
@@ -772,6 +809,7 @@ class CopilotService:
 
         # 5. Seismic events (USGS)
         eventos = self.load_query_events()
+        requested_event_ids = set(re.findall(r"\b(?:us|ak|ci|nc|uw|pr|nn|tx|hv)[a-z0-9]*\d[a-z0-9]*\b", q_lower))
         if (
             "sismo" in q_lower
             or "terremoto" in q_lower
@@ -783,35 +821,125 @@ class CopilotService:
             or "burica" in q_lower
             or "profundidad" in q_lower
             or "magnitud" in q_lower
+            or requested_event_ids
         ):
-            ev = None
-            if "us7000m1a1" in q_lower or "chiriquí" in q_lower or "chiriqui" in q_lower or "burica" in q_lower:
-                ev = next((e for e in eventos if "us7000m1a1" in e.id or "burica" in e.place.lower()), None)
-            elif "us7000m1a2" in q_lower or "coiba" in q_lower:
-                ev = next((e for e in eventos if "us7000m1a2" in e.id or "coiba" in e.place.lower()), None)
-            elif "us7000m1a3" in q_lower or "armuelles" in q_lower:
-                ev = next((e for e in eventos if "us7000m1a3" in e.id or "armuelles" in e.place.lower()), None)
+            event_candidates = [
+                event
+                for event in eventos
+                if not requested_years
+                or datetime.fromtimestamp(event.time / 1000, timezone.utc).year in requested_years
+            ]
+            if requested_event_ids:
+                event_candidates = [event for event in event_candidates if event.id.casefold() in requested_event_ids]
             else:
-                ev = eventos[0] if eventos else None
+                event_query_words = {
+                    "que",
+                    "qué",
+                    "cual",
+                    "cuál",
+                    "fue",
+                    "es",
+                    "el",
+                    "la",
+                    "del",
+                    "de",
+                    "en",
+                    "según",
+                    "segun",
+                    "tuvo",
+                    "sismo",
+                    "terremoto",
+                    "evento",
+                    "sísmico",
+                    "sismico",
+                    "magnitud",
+                    "profundidad",
+                    "estatus",
+                    "reportado",
+                    "reporte",
+                    "registrado",
+                    "registró",
+                    "registro",
+                    "catálogo",
+                    "catalogo",
+                    "usgs",
+                    "regional",
+                    "oficial",
+                    "mayor",
+                    "más",
+                    "mas",
+                    "último",
+                    "ultimo",
+                    "reciente",
+                    "última",
+                    "ultima",
+                    "enero",
+                    "febrero",
+                    "marzo",
+                    "abril",
+                    "mayo",
+                    "junio",
+                    "julio",
+                    "agosto",
+                    "septiembre",
+                    "octubre",
+                    "noviembre",
+                    "diciembre",
+                    "por",
+                    "para",
+                    "sobre",
+                    "reportó",
+                    "reporto",
+                    "registrada",
+                }
+                location_terms = {
+                    term for term in re.findall(r"\w+", q_lower) if not term.isdigit() and term not in event_query_words
+                }
+                if location_terms:
+                    event_candidates = [
+                        event
+                        for event in event_candidates
+                        if location_terms <= set(re.findall(r"\w+", event.place.lower()))
+                    ]
+            if re.search(r"\b([uú]ltim[oa]|reciente)\b", q_lower) and event_candidates:
+                event_candidates = [max(event_candidates, key=lambda event: event.time)]
+            elif "mayor magnitud" in q_lower and event_candidates:
+                event_candidates = [max(event_candidates, key=lambda event: event.magnitude)]
 
-            if ev:
+            if len(event_candidates) == 1:
+                ev = event_candidates[0]
+                source_time = datetime.fromtimestamp(ev.time / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
                 status_note = f" con estatus oficial '{ev.status}'" if "estatus" in q_lower else ""
                 return QueryResponse(
                     consulta=consulta,
                     respuesta=(
                         f"El catálogo sísmico oficial del USGS registró el evento {ev.id}{status_note}, "
-                        f"de magnitud {ev.magnitude} en la ubicación '{ev.place}' (profundidad: {ev.depth} km, estatus: {ev.status})."
+                        f"con fecha {source_time}, de magnitud {ev.magnitude} en la ubicación '{ev.place}' "
+                        f"(profundidad: {ev.depth} km, estatus: {ev.status})."
                     ),
                     es_abstencion=False,
                     citas=[
                         {
                             "id_fuente": ev.id,
-                            "campo_o_pasaje": "status" if "estatus" in q_lower else "magnitude",
-                            "texto_sustento": f"Estatus: {ev.status}, magnitud: {ev.magnitude} en {ev.place}",
+                            "campo_o_pasaje": "status"
+                            if "estatus" in q_lower
+                            else ("depth" if "profundidad" in q_lower else "magnitude"),
+                            "texto_sustento": f"Fecha: {source_time}, estatus: {ev.status}, magnitud: {ev.magnitude}, "
+                            f"profundidad: {ev.depth} km, ubicación: {ev.place}",
                             "url_fuente": ev.url,
                         }
                     ],
                 )
+            return QueryResponse(
+                consulta=consulta,
+                respuesta=SafetyGuard.format_explicit_abstention(
+                    consulta,
+                    "No hay un evento único que coincida con ID, ubicación y año solicitados; "
+                    "especifica el ID o acota el período del catálogo",
+                ),
+                es_abstencion=True,
+                citas=[],
+            )
 
         # 6. Canal draft / calado
         noticias = self.load_query_news()
@@ -823,37 +951,49 @@ class CopilotService:
         elif re.search(r"\borigen\b|\bextracci[oó]n\b", q_lower):
             metadata_field = "origen"
 
-        if ("calado" in q_lower or "canal" in q_lower) and metadata_field is None:
-            year_match = re.search(r"\b(20\d{2})\b", q_lower)
+        if "calado" in q_lower and metadata_field is None:
             canal_news = [n for n in noticias if "calado" in n.titulo.lower()]
-            n_canal = (
-                next((n for n in canal_news if n.fecha_publicacion.startswith(year_match.group(1))), None)
-                if year_match
-                else next(iter(canal_news), None)
-            )
-            if n_canal:
+            if requested_years:
+                canal_news = [
+                    news for news in canal_news if news.fecha_publicacion[:4] in {str(year) for year in requested_years}
+                ]
+            measured_news = [news for news in canal_news if re.search(r"\b\d+(?:[.,]\d+)?\s*pies\b", news.titulo)]
+            if measured_news:
+                measurements = {
+                    value.replace(",", ".")
+                    for news in measured_news
+                    for value in re.findall(r"\b(\d+(?:[.,]\d+)?)\s*pies\b", news.titulo)
+                }
+                # Different figures may refer to different dates; expose them without asserting a contradiction.
+                selected = measured_news if len(measurements) > 1 else [measured_news[0]]
+                excerpts = "\n".join(
+                    f"- {news.id_noticia}: '{news.titulo}' ({news.medio}, {news.fecha_publicacion})."
+                    for news in selected
+                )
+                note = (
+                    "Hay cifras diferentes entre los registros; verificación pendiente de fecha y alcance de cada versión."
+                    if len(measurements) > 1
+                    else "El dato corresponde a la fecha del registro; no confirma el calado vigente hoy."
+                )
                 return QueryResponse(
                     consulta=consulta,
-                    respuesta=(
-                        f"Según el reporte '{n_canal.titulo}' publicado por {n_canal.medio} el {n_canal.fecha_publicacion}, "
-                        f"el calado operacional informado es de 45 pies para el tránsito de buques."
-                    ),
+                    respuesta=f"basado únicamente en titular/metadatos:\n{excerpts}\n{note}",
                     es_abstencion=False,
                     citas=[
                         {
-                            "id_fuente": n_canal.id_noticia,
+                            "id_fuente": news.id_noticia,
                             "campo_o_pasaje": "titulo",
-                            "texto_sustento": n_canal.titulo,
-                            "url_fuente": n_canal.url,
+                            "texto_sustento": news.titulo,
+                            "url_fuente": news.url,
                         }
+                        for news in selected
                     ],
                 )
-            if year_match:
-                abstencion = SafetyGuard.format_explicit_abstention(
-                    topic_or_query=consulta,
-                    missing_reason=f"No hay un reporte de calado con fecha {year_match.group(1)} en el corpus",
-                )
-                return QueryResponse(consulta=consulta, respuesta=abstencion, es_abstencion=True, citas=[])
+            abstencion = SafetyGuard.format_explicit_abstention(
+                topic_or_query=consulta,
+                missing_reason="No hay un titular con medición explícita del calado para las fechas solicitadas",
+            )
+            return QueryResponse(consulta=consulta, respuesta=abstencion, es_abstencion=True, citas=[])
 
         # 7. Recirculated news (T03)
         if "recirculad" in q_lower or (
@@ -900,11 +1040,47 @@ class CopilotService:
             "se",
             "al",
             "es",
+            "sobre",
+            "noticias",
+            "noticia",
+            "titular",
+            "titulares",
+            "muéstrame",
+            "muestra",
+            "qué",
+            "cuál",
+            "cual",
+            "cuales",
+            "cuáles",
+            "quién",
+            "quien",
+            "publicó",
+            "publico",
+            "reportó",
+            "reporto",
+            "inicialmente",
+            "oficial",
+            "registrado",
+            "tema",
+            "medio",
+            "origen",
+            "extracción",
+            "extraccion",
+            "panamá",
+            "panama",
         }
-        significant_tokens = query_tokens - stop_words
+        significant_tokens = {token for token in query_tokens - stop_words if len(token) > 2 and not token.isdigit()}
         if "autoridad" in q_lower and "canal" in q_lower:
             significant_tokens.add("acp")
-        matching_news = [n for n in noticias if any(t in n.titulo.lower() for t in significant_tokens)]
+        matching_news = [
+            news
+            for news in noticias
+            if significant_tokens & set(re.findall(r"\w+", news.titulo.lower()))
+            and (not requested_years or news.fecha_publicacion[:4] in {str(year) for year in requested_years})
+        ]
+        matching_news.sort(
+            key=lambda news: len(significant_tokens & set(re.findall(r"\w+", news.titulo.lower()))), reverse=True
+        )
 
         if matching_news:
             if metadata_field == "tema" and "calado" in q_lower:
@@ -946,17 +1122,26 @@ class CopilotService:
                     "url_fuente": lead.url,
                 }
             ]
-            prompt = (
-                f"Responde brevemente a la siguiente consulta periodística basada únicamente en los datos sustentados:\n"
-                f"Consulta: {consulta}\n"
-                f'<source_data id="{lead.id_noticia}">{lead.titulo} ({lead.medio}, {lead.fecha_publicacion})</source_data>\n'
-                "Requisito estricto: Cita la fuente y no inventes detalles que no estén en el texto."
+            requests_headlines = re.search(
+                r"\b(titulares?|noticias?|reportes?|resumen|resume|resumir)\b|\bqu[eé]\s+(anunci[oó]|sabemos)\b",
+                q_lower,
             )
-            raw_answer = await self.llm.generate_text(prompt=prompt)
+            excerpt = (
+                f"basado únicamente en titular/metadatos: '{lead.titulo}' ({lead.medio}, {lead.fecha_publicacion})."
+            )
+            answer = (
+                excerpt
+                if requests_headlines
+                else SafetyGuard.format_explicit_abstention(
+                    consulta,
+                    "Se encontró un titular relacionado, pero esta ruta no permite confirmar el detalle solicitado",
+                )
+                + f"\nRegistro relacionado para investigar: {excerpt}"
+            )
             return QueryResponse(
                 consulta=consulta,
-                respuesta=raw_answer,
-                es_abstencion=False,
+                respuesta=answer,
+                es_abstencion=not bool(requests_headlines),
                 citas=citas,
             )
 

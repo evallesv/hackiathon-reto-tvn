@@ -148,7 +148,7 @@ async def test_editorial_query_uses_live_usgs_event(tmp_path: Path) -> None:
         ]
     )
 
-    response = await service.answer_query_async("¿Qué reportó USGS sobre el sismo de Burica?")
+    response = await service.answer_query_async("¿Qué reportó USGS sobre el último sismo de Burica?")
 
     assert "4.8" in response.respuesta
     assert response.citas[0]["id_fuente"] == "us7000m1a1-live"

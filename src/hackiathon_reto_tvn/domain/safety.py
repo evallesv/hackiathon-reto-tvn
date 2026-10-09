@@ -10,6 +10,7 @@ Rules enforced:
 4. Independent verification: Replicated news wire/agency counts as a single provenance (T02).
 """
 
+import html
 import re
 import unicodedata
 from typing import List, Tuple
@@ -23,7 +24,7 @@ class SafetyGuard:
     # Common prompt injection and adversarial manipulation patterns
     INJECTION_PATTERNS = [
         r"ignore\s+(all\s+)?(previous|prior)\s+instructions",
-        r"ignora\s+(todas\s+las\s+)?instrucciones\s+(previas|anteriores)",
+        r"ignora\s+(todas\s+)?(las\s+)?instrucciones\s+(previas|anteriores)",
         r"system\s+(prompt|alert)",
         r"override\s+(safety\s+)?instructions",
         r"disregard\s+(all\s+)?(limits|instructions|rules)",
@@ -85,7 +86,6 @@ class SafetyGuard:
         "se",
         "segun",
         "según",
-        "sin",
         "sobre",
         "su",
         "sus",
@@ -120,6 +120,9 @@ class SafetyGuard:
         "recibido",
         "recibida",
     }
+
+    # These markers carry factual polarity and must never be discarded as function words.
+    NEGATION_TOKENS = {"no", "sin", "nunca", "jamas", "ni", "tampoco", "ningun", "ninguno", "ninguna"}
 
     @classmethod
     def sanitize_untrusted_text(cls, text: str) -> Tuple[str, bool]:
@@ -160,8 +163,8 @@ class SafetyGuard:
 
     @staticmethod
     def _neutralize_tags(text: str) -> str:
-        """Prevents untrusted text from closing or forging isolation tags (tag breakout)."""
-        return re.sub(r"<(/?)(source_data|title|content)\b", r"&lt;\1\2", text, flags=re.IGNORECASE)
+        """Escape all source markup and attribute quotes so the payload contains only text data."""
+        return html.escape(text, quote=True)
 
     @staticmethod
     def validate_citation_coverage(
@@ -210,8 +213,9 @@ class SafetyGuard:
     ) -> Tuple[float, List[str]]:
         """Checks citation IDs and conservatively rejects claim tokens absent from cited passages.
 
-        This lexical containment check is a fail-closed guard, not semantic entailment or
-        independent verification of the source's truthfulness.
+        Negation markers must also match the cited excerpts: dropping or adding a simple
+        negation is rejected. This token filter cannot determine which clause a negation
+        modifies and does not establish semantic entailment or the source's truthfulness.
         """
         factual_types = {TipoAfirmacion.HECHO, TipoAfirmacion.DECLARACION}
         total_factual = 0
@@ -250,11 +254,19 @@ class SafetyGuard:
                     continue
                 cited_tokens.update(cls._factual_tokens(cita.texto_sustento))
 
-            unsupported_tokens = cls._factual_tokens(afirmacion.texto) - cited_tokens
+            claim_tokens = cls._factual_tokens(afirmacion.texto)
+            unsupported_tokens = claim_tokens - cited_tokens
             if unsupported_tokens:
                 violations.append(
                     f"Afirmación '{afirmacion.id_afirmacion}' contiene términos ausentes de los pasajes citados: "
                     f"{', '.join(sorted(unsupported_tokens))}."
+                )
+                invalid_citation = True
+
+            if claim_tokens & cls.NEGATION_TOKENS != cited_tokens & cls.NEGATION_TOKENS:
+                violations.append(
+                    f"Afirmación '{afirmacion.id_afirmacion}' modifica u omite marcadores de negación "
+                    "presentes en los pasajes citados."
                 )
                 invalid_citation = True
 

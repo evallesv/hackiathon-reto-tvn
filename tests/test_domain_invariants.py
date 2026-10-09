@@ -162,6 +162,32 @@ async def test_draft_with_uncited_fact_is_rejected_in_strict_mode() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("claim_type", [None, TipoAfirmacion.HIPOTESIS])
+async def test_draft_cannot_skip_factual_citation_check_by_omitting_facts(claim_type: TipoAfirmacion | None) -> None:
+    draft = await _mock_draft()
+    draft.afirmaciones = (
+        [Afirmacion(id_afirmacion="AF-X", texto="Impacto no evaluado", tipo=claim_type)] if claim_type else []
+    )
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="afirmación factual"):
+        await service.generate_tvn_editorial_package(caso)
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
+
+
+@pytest.mark.asyncio
+async def test_headline_only_label_is_derived_from_case_evidence() -> None:
+    draft = await _mock_draft()
+    draft.basado_unicamente_en_titular_metadatos = False
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+
+    with pytest.raises(ValueError, match="titular/metadatos"):
+        await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
 async def test_draft_citing_unknown_source_is_rejected() -> None:
     draft = await _mock_draft()
     draft.afirmaciones[0].citas[0].id_fuente = "NOT-FANTASMA"
