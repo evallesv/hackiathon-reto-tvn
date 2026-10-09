@@ -249,28 +249,43 @@ class SQLiteStorage:
             ON CONFLICT(id) DO UPDATE SET
                 magnitude = excluded.magnitude,
                 place = excluded.place,
+                time = excluded.time,
                 updated = excluded.updated,
+                url = excluded.url,
+                latitud = excluded.latitud,
+                longitud = excluded.longitud,
+                profundidad = excluded.profundidad,
                 status = excluded.status;
         """
         processed = 0
         with self.get_connection() as conn:
             for rec in records:
-                params = {
-                    "id": rec.get("id", ""),
-                    "magnitude": float(rec.get("magnitude", 0.0)),
-                    "place": rec.get("place", "Región Panamá"),
-                    "time": int(rec.get("time", 0)),
-                    "updated": int(rec["updated"]) if rec.get("updated") is not None else None,
-                    "url": rec.get("url", ""),
-                    "latitud": float(rec.get("latitud", 0.0)) if rec.get("latitud") is not None else None,
-                    "longitud": float(rec.get("longitud", 0.0)) if rec.get("longitud") is not None else None,
-                    "profundidad": float(rec.get("profundidad", 0.0)) if rec.get("profundidad") is not None else None,
-                    "status": rec.get("status", "reviewed"),
-                    "created_at": now_utc,
-                }
-                if params["id"]:
-                    conn.execute(upsert_query, params)
-                    processed += 1
+                if any(rec.get(field) is None for field in ("id", "magnitude", "place", "time")) or not all(
+                    str(rec[field]).strip() for field in ("id", "place")
+                ):
+                    logger.warning(
+                        "Evento USGS %s excluido: faltan campos obligatorios, sin imputar valores.", rec.get("id")
+                    )
+                    continue
+                try:
+                    params = {
+                        "id": rec["id"],
+                        "magnitude": float(rec["magnitude"]),
+                        "place": rec["place"],
+                        "time": int(rec["time"]),
+                        "updated": int(rec["updated"]) if rec.get("updated") is not None else None,
+                        "url": rec.get("url"),
+                        "latitud": float(rec["latitud"]) if rec.get("latitud") is not None else None,
+                        "longitud": float(rec["longitud"]) if rec.get("longitud") is not None else None,
+                        "profundidad": float(rec["profundidad"]) if rec.get("profundidad") is not None else None,
+                        "status": rec.get("status"),
+                        "created_at": now_utc,
+                    }
+                except (TypeError, ValueError, OverflowError):
+                    logger.warning("Evento USGS %s excluido: valores numéricos incompatibles.", rec.get("id"))
+                    continue
+                conn.execute(upsert_query, params)
+                processed += 1
         return processed
 
     def record_run(

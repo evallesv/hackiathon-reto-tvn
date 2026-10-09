@@ -210,6 +210,7 @@ def test_sqlite_snapshot_merges_recent_local_ingestion_without_review_state(tmp_
                 "profundidad": 11.0,
                 "place": "Panama region",
                 "url": "https://earthquake.usgs.gov/event/live-earthquake",
+                "status": "reviewed",
             }
         ]
     )
