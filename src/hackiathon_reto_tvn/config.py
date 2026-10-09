@@ -1,7 +1,7 @@
 """Application configuration and settings management via pydantic-settings.
 
 Supports environment variables and .env files with interchangeable LLM providers:
-- opencode (Default: model muse-spark-1.3-contributor-free)
+- opencode (Default: model muse-spark-1.3-contributor)
 - gemini (Alternative: model gemini-2.5-flash / gemini-1.5-flash)
 - mock (Offline testing and CI fallback)
 """

@@ -1,74 +1,55 @@
-# 02 — Plan y Decisiones de Arquitectura
+# 02 — Plan, Decisiones y Registro Verificable
 
-> **Espacio Oficial de Presentación en Notion Business**  
-> **Gestión del Trabajo y Registro de Decisiones de Arquitectura (ADRs)**
+> Contenido local preparado para Notion Business. Responsables personales, publicación y registro en el espacio real pendientes.
 
----
+## 1. Backlog y evidencias del repositorio
 
-## 1. Backlog de Trabajo y Trazabilidad de Tareas
+El siguiente registro referencia commits existentes y pruebas localizables. «Implementado» describe código y comprobaciones automáticas; no equivale a aceptación editorial, publicación en Notion o evaluación independiente. Las responsabilidades humanas están pendientes de asignación.
 
-A continuación se detalla la matriz de tareas ejecutadas en el repositorio siguiendo el flujo de trabajo ágil con trazabilidad directa a GitHub Issues y Pull Requests:
-
-| ID Tarea | Módulo / Componente | Descripción | Estado | Criterio de Aceptación Verificado |
+| Tarea | Cambio y commit verificable | Evidencia local | Estado | Responsable |
 | :--- | :--- | :--- | :--- | :--- |
-| **TSK-01** | `domain/models.py` | Modelado de contratos inmutables: `Noticia`, `Indicador`, `FichaCaso`, `BorradorEditorial`, `BorradorBancario`. | **Completado** | Validación estricta Pydantic v2; campos en `snake_case` (T10). |
-| **TSK-02** | `domain/scoring.py` | Implementación de la fórmula $P = 30R + 25I + 20U + 15N + 10E$ y desempate por urgencia. | **Completado** | Bandas no solapadas [0,40), [40,70), [70,100]. Desempate determinista. |
-| **TSK-03** | `domain/safety.py` | Sanitización de inyección y control conservador de ID, fragmento citado y términos de afirmación. | **Parcial** | T07; T09 rechaza términos ausentes del fragmento, pero no evalúa implicación semántica ni extrae cada hecho del texto libre. Requiere revisión humana. |
-| **TSK-04** | `adapters/data/loaders.py` | Carga de CSV y GeoJSON congelados con tolerancia a nulos y fechas no parseables. | **Completado** | T01 (conserva `None` en fechas/números), T04 (preserva año, país, unidad). |
-| **TSK-05** | `adapters/decision/` | Conectores System One: Cloudflare Clef (`@cf/cloudflare/clef`), Jev y Mock offline. | **Implementado; evaluación pendiente** | Los conectores existen; falta medir el proveedor real contra etiquetas humanas. |
-| **TSK-06** | `adapters/llm/` | Conectores System Two: OpenCode (`muse-spark-1.3`), Gemini 2.5 Flash y Mock offline. | **Completado** | Generación de paquetes editoriales estructurados con citas estrictas. |
-| **TSK-07** | `services/copilot_service.py` | Orquestación: priorización de agenda, detección de contradicciones y abstención explícita. | **Completado** | T05 (contradicciones side-by-side), T06 (abstención explícita sin alucinar). |
-| **TSK-08** | `services/baseline_evaluator.py` | Benchmark de 60 consultas (40 desarrollo / 20 reservadas) y comparación con baselines. | **Parcial; requiere custodia externa** | La API y el runner solo ejecutan las 40 de desarrollo; las etiquetas reservadas están expuestas. P@5 usa keywords y contradicciones son diez pares sintéticos evaluados por el adaptador configurado. |
-| **TSK-09** | `adapters/data/sqlite_storage.py` | Capa persistente en SQLite WAL para fichas, revisiones humanas y auditoría de ingesta periódica. | **Completado** | Persistencia transaccional de revisiones editoriales; estadísticas en vivo. |
-| **TSK-10** | `ui/ (Dashboard)` | Interfaz web interactiva Dark Glassmorphism para demostración en vivo ante el jurado. | **Completado** | Cero dependencias npm; 4 vistas completas; responsive; compatible offline. |
+| TSK-01 | Snapshot SQLite: `444ab5f` | [Pruebas del snapshot](../../tests/test_sqlite_snapshot.py); [ADR-0019](../adr/0019-sqlite-offline-snapshot-package.md). | Implementado; revisar paquete efectivo del ensayo. | Por asignar. |
+| TSK-02 | Límites de brief/copy/guion: `df26899` | [Invariantes editoriales](../../tests/test_domain_invariants.py); [ADR-0020](../adr/0020-editorial-deliverable-constraints.md). | Implementado; validación humana de piezas pendiente. | Por asignar. |
+| TSK-03 | Identidad nullable de indicadores: `7021d1b` | [Loaders](../../tests/test_data_loaders.py); [ADR-0021](../adr/0021-preserve-missing-indicator-identifiers.md). | Implementado. | Por asignar. |
+| TSK-04 | Agrupación léxica y manifiesto de solo lectura: `d93a6c6` | [Loaders](../../tests/test_data_loaders.py), [API](../../tests/test_api.py); [ADR-0022](../adr/0022-deterministic-news-event-grouping.md), [ADR-0023](../adr/0023-read-only-manifest-endpoint.md). | Implementado; agrupación semántica general no demostrada. | Por asignar. |
+| TSK-05 | Benchmark aislado del corpus operativo: `3053178` | [Pruebas de evaluación](../../tests/test_benchmark_baseline.py); [ADR-0024](../adr/0024-protect-reserved-benchmark-and-report-real-adapter.md). | Desarrollo exploratorio; evaluación humana pendiente. | Por asignar. |
+| TSK-06 | Validación de IDs citados: `8d2656a` | [Pruebas de evaluación](../../tests/test_benchmark_baseline.py). | Implementado; ID resoluble no prueba sustento semántico. | Por asignar. |
+| TSK-07 | Resolución de indicador y metadatos: `664072d` | [Consultas y banca](../../tests/test_query_and_banking.py). | Implementado para los escenarios probados. | Por asignar. |
+| TSK-08 | Runner para holdout externo: `4f5d8a5` | [Pruebas de evaluación](../../tests/test_benchmark_baseline.py). | Implementado; nuevo conjunto y custodia independiente pendientes. | Por asignar. |
+| TSK-09 | Respuestas extractivas y guardas de borrador: `8b22419` | [Consultas](../../tests/test_query_and_banking.py), [safety](../../tests/test_safety.py), [invariantes](../../tests/test_domain_invariants.py); [ADR-0025](../adr/0025-corpus-grounded-query-and-draft-guards.md). | Implementado; revisión de soporte factual pendiente. | Por asignar. |
+| TSK-10 | USGS incompleto sin imputación: `4da6c99` | [Loaders](../../tests/test_data_loaders.py), [snapshot](../../tests/test_sqlite_snapshot.py). | Implementado; registros incompletos se excluyen o bloquean el empaquetado. | Por asignar. |
+| TSK-11 | Proveedor efectivo y planilla de adjudicación: `5fdf287` | [Revisión humana](../validation/README.md), [pruebas](../../tests/test_human_review.py); [ADR-0026](../adr/0026-human-adjudication-and-effective-model-reporting.md). | Material preparado; veredictos humanos pendientes. | Por asignar. |
+| TSK-12 | Publicar ocho páginas y ensayar desde Notion | [Índice local](README.md), [pitch](08-presentacion-al-jurado.md). | Publicación, permisos, registro de ejecución y ensayo pendientes. | Por asignar. |
 
----
+## 2. Cronología comprobable y reproducción
 
-## 2. Cronología y Fases de Ejecución
+Los commits anteriores pertenecen al historial local de la rama de trabajo. Su existencia no prueba que estén publicados en GitHub ni que se hayan registrado en Notion durante el evento. Las fechas se obtienen del historial, no de un cronograma supuesto:
 
-```mermaid
-gantt
-    title Cronograma de Implementación — HackIAthon Copilot TVN
-    dateFormat  YYYY-MM-DD
-    section Fase 1: Dominio y Contratos
-    Modelos de Dominio y Scoring P       :done, 2026-10-06, 1d
-    Seguridad, Citas y Anti-Inyección     :done, 2026-10-06, 1d
-    section Fase 2: Adaptadores e Ingesta
-    Loaders Congelados y SHA-256 Manifest:done, 2026-10-06, 1d
-    Conectores System One y System Two   :done, 2026-10-07, 1d
-    section Fase 3: Evaluación y Benchmark
-    Benchmark 60 Consultas y Baselines   :done, 2026-10-07, 1d
-    Fichas Canónicas y Persistencia SQLite:done, 2026-10-07, 1d
-    section Fase 4: UX y Despliegue
-    Dashboard Web Dark Glassmorphism     :done, 2026-10-07, 1d
-    Documentación Notion y Calidad       :done, 2026-10-07, 1d
+```bash
+git log --format='%h %aI %s' --date=iso-strict
 ```
 
----
+El commit `8b22419` corrige, entre otros, una respuesta de calado que devolvía 45 pies cuando el titular de la prueba contenía 44. La regresión está en `test_canal_answer_quotes_actual_measurement`. Las pruebas de país/año, negación y escape XML también documentan los casos concretos corregidos. Conservar en Notion el fallo reproducido, cambio, ejecución posterior, fecha y responsable real.
 
-## 3. Decisiones Técnicas Justificadas (Architecture Decision Records — ADRs)
+La integración de `5fdf287` tiene un registro de verificación local en [ADR-0026](../adr/0026-human-adjudication-and-effective-model-reporting.md). Ese resultado corresponde a esa ejecución; actualizar el estado y número de pruebas con la **última ejecución de `make check`** antes del cierre:
 
-### Decisión 1: Arquitectura Hexagonal Pura (Ports & Adapters) — [ADR-0001]
-- **Contexto**: El reto exige independencia total respecto a proveedores comerciales de LLM y capacidad de ejecución determinista sin conexión de red (T10).
-- **Decisión**: Aislar el núcleo de negocio en `domain/` con cero dependencias de FastAPI, SQLite, o SDKs de IA. Toda interacción externa se media a través de protocolos abstractos en `ports/`.
-- **Justificación**: Permite sustituir proveedores (OpenCode &harr; Gemini &harr; Mock, Clef &harr; Jev) mediante una variable de entorno sin tocar una sola línea de lógica editorial.
+```bash
+make check
+LLM_PROVIDER=mock DECISION_PROVIDER=mock INGESTION_ENABLED=false make benchmark
+```
 
-### Decisión 2: Segregación entre Modelo de Decisión (System One) y Generativo (System Two) — [ADR-0004]
-- **Contexto**: Evaluar los factores $R, I, U, N, E$ y detectar contradicciones (T05) con modelos generativos grandes es lento, costoso y propenso a variaciones estocásticas.
-- **Decisión**: Emplear modelos ligeros de clasificación (System One, como Cloudflare Clef o Jev) para scoring y detección booleana, reservando el LLM generativo (System Two, Muse-Spark / Gemini) exclusivamente para redactar el paquete editorial final.
-- **Justificación**: Mantener las predicciones del modelo de decisión separadas del LLM generativo. La mejora frente a reglas requiere una evaluación real y etiquetada; aún no está demostrada.
+Guardar las salidas, commit, corpus/manifiesto y entorno. La suite offline no sustituye el ensayo del recorrido completo desde Notion ni una evaluación humana independiente.
 
-### Decisión 3: Desacoplamiento Estricto entre Corpus Congelado y Persistencia SQLite WAL — [ADR-0010]
-- **Contexto**: El reto exige reproducibilidad criptográfica al 100% con un manifest SHA-256 (`data/raw/`), pero la operación productiva en Fly.io requiere almacenar noticias vivas de RSS y estados de revisión humana de las fichas.
-- **Decisión**: Mantener `data/raw/` inmutable y montar una base de datos SQLite en modo WAL (`data/storage/copilot.db` o volumen montado en Fly.io `/data`).
-- **Justificación**: Garantiza que ninguna prueba ni ejecución en vivo contamine los archivos de referencia del jurado, mientras dota al sistema de persistencia entre reinicios del contenedor.
+## 3. Decisiones técnicas justificadas
 
-### Decisión 4: Protocolo de Citación Estricta en Memoria con Abstención Explícita — [ADR-0011]
-- **Contexto**: La alucinación de datos estadísticos o citas textuales es inaceptable en una redacción periodística.
-- **Decisión**: El motor de respuestas (`answer_query_async`) sólo sintetiza respuestas si localiza fragmentos verificables en el corpus; ante la ausencia de evidencia suficiente emite el marcador canónico `[ABSTENCIÓN EXPLÍCITA]`.
-- **Justificación**: Las pruebas locales cubren escenarios controlados. No se presenta una tasa general de citas ni abstención; el benchmark disponible no constituye evaluación humana independiente ni valida sustento semántico.
+1. **Separar reglas de dominio y proveedores.** [ADR-0002](../adr/0002-ports-and-adapters-for-llm-connectors.md) mantiene adaptadores detrás de puertos para poder cambiar proveedor y demostrar el flujo con mocks. El fallback debe identificarse; no acredita desempeño del modelo remoto.
+2. **Separar decisión y generación.** [ADR-0010](../adr/0010-system-one-decision-models-cloudflare-clef-and-jev.md) y [ADR-0013](../adr/0013-unified-opencode-routing-for-system-one-and-two.md) describen preguntas tipadas y ruteo. La [ejecución Jev](../validation/decision_jev_2026-10-09.json) compara diez pares sintéticos con regex y guarda salidas; las etiquetas editoriales independientes siguen pendientes.
+3. **Distinguir corpus, snapshot y estado operativo.** [ADR-0011](../adr/0011-sqlite-persistent-storage-and-periodic-ingestion.md) y [ADR-0019](../adr/0019-sqlite-offline-snapshot-package.md) separan ingesta/revisiones mutables del paquete de consulta de solo lectura. SQLite permite consultas sin servidor; no crea automáticamente un conjunto de entrenamiento o evaluación independiente.
+4. **Responder desde evidencia y mantener revisión humana.** [ADR-0004](../adr/0004-anti-hallucination-and-prompt-injection-defenses.md) y [ADR-0025](../adr/0025-corpus-grounded-query-and-draft-guards.md) aíslan fuentes, devuelven extractos/abstención y validan afirmaciones estructuradas conservadoramente. Los controles no prueban implicación semántica de todos los textos libres.
+5. **Proteger la evaluación reservada y registrar el proveedor efectivo.** [ADR-0024](../adr/0024-protect-reserved-benchmark-and-report-real-adapter.md) y [ADR-0026](../adr/0026-human-adjudication-and-effective-model-reporting.md) separan desarrollo, fallbacks y preparación de adjudicación. Las veinte etiquetas expuestas no son ciegas y un archivo externo no prueba independencia por sí solo.
+6. **Preparar Notion localmente sin afirmar publicación.** [ADR-0007](../adr/0007-notion-business-contract-and-sync.md) permite carga manual y exige URL, permisos y registros reales. El espejo Markdown no asegura habilitación.
+7. **Integrar mediante ramas y revisión.** [ADR-0012](../adr/0012-multi-agent-git-workflow-and-main-protection.md) protege `main`, ligada al despliegue. Los commits locales no equivalen a PR revisada o aplicación desplegada.
 
-### Decisión 5: Protección de Rama Principal y Git Rebase Lineal — [ADR-0012]
-- **Contexto**: La integración continua en Fly.io despliega automáticamente a producción ante cualquier push a `main`.
-- **Decisión**: Prohibir commits directos en `main`; trabajar en ramas `feat/...` y sincronizar siempre mediante `git fetch origin && git rebase origin/main` para preservar un historial lineal sin "merge commits".
-- **Justificación**: Evita regresiones accidentales en producción y garantiza trazabilidad atómica para auditoría de código.
+## 4. Próximos pasos que requieren personas
+
+Asignar responsables reales; confirmar espacio Business y acceso del jurado; revisar al menos treinta afirmaciones si se producen tantas y los borradores completos; obtener selección editorial independiente y un holdout nuevo bajo custodia; ampliar la evaluación NLP/ML medida a casos editoriales etiquetados; ensayar y registrar el pitch desde Notion. Hasta contar con esas evidencias, los resultados automáticos y el valor operativo se presentan con sus límites.

@@ -230,7 +230,7 @@ hackiathon-reto-tvn/
 │   │   │   ├── mock_decision_adapter.py   # Deterministic offline provider (T10 & CI)
 │   │   │   └── factory.py                 # Provider factory (get_decision_client)
 │   │   ├── llm/              # System Two text generation
-│   │   │   ├── opencode_adapter.py        # Default provider: muse-spark-1.3-contributor-free
+│   │   │   ├── opencode_adapter.py        # Default provider: muse-spark-1.3-contributor
 │   │   │   ├── gemini_adapter.py          # Alternative provider: google-genai SDK
 │   │   │   ├── mock_adapter.py            # Deterministic offline provider (T10 & CI)
 │   │   │   └── factory.py                 # Provider factory (get_llm_client)
@@ -297,8 +297,8 @@ The system segregates **System One** non-generative decision models from **Syste
 ### 7.1. System One Decision Models (`DECISION_PROVIDER`)
 | Provider Key | Adapter Class | Default Model | Configuration Keys |
 | :--- | :--- | :--- | :--- |
-| **`cloudflare`** *(Default)* | `CloudflareClefAdapter` | `@cf/cloudflare/clef` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DECISION_MODEL` |
-| **`jev`** *(Alternative)* | `JevAdapter` | `jev-latest` | `TYPESAFE_API_KEY`, `TYPESAFE_BASE_URL` |
+| **`cloudflare`** *(Alternative)* | `CloudflareClefAdapter` | `@cf/cloudflare/clef` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DECISION_MODEL` |
+| **`jev`** *(Default)* | `JevAdapter` | `jev-1.13-free` | `TYPESAFE_API_KEY` or `OPENCODE_API_KEY`, `TYPESAFE_BASE_URL` |
 | **`mock`** *(Deterministic/CI)* | `MockDecisionAdapter` | `mock-decision-offline` | None (Offline, deterministic) |
 
 * Concurrency limit controlled by `DECISION_CONCURRENCY_LIMIT` (default 5 concurrent requests) using `asyncio.Semaphore`.
@@ -307,7 +307,7 @@ The system segregates **System One** non-generative decision models from **Syste
 ### 7.2. System Two Generative LLMs (`LLM_PROVIDER`)
 | Provider Key | Adapter Class | Default Model | Configuration Keys |
 | :--- | :--- | :--- | :--- |
-| **`opencode`** *(Default)* | `OpenCodeAdapter` | `muse-spark-1.3-contributor-free` | `OPENCODE_API_KEY`, `OPENCODE_BASE_URL` |
+| **`opencode`** *(Default)* | `OpenCodeAdapter` | `muse-spark-1.3-contributor` | `OPENCODE_API_KEY`, `OPENCODE_BASE_URL` |
 | **`gemini`** *(Alternative)* | `GeminiAdapter` | `gemini-2.5-flash` | `GEMINI_API_KEY`, `GEMINI_MODEL` |
 | **`mock`** *(Deterministic/CI)* | `MockLLMAdapter` | `mock-muse-spark-offline` | None (Offline, deterministic) |
 
@@ -370,6 +370,8 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | **USGS partial records** | The shared `EventoGeoJSON` contract requires numeric values. Fetchers retain missing values as null; invalid historical/live records are excluded from query models with diagnostics. Snapshot packaging fails before publication if operational records are incompatible, rather than replacing null with zero. Real zeros remain unchanged. Supporting partial event models requires an explicit contract change. | `tests/test_data_loaders.py`, `tests/test_sqlite_snapshot.py`, `tests/test_live_agenda.py` |
 | **Naming deviation** | `EventoGeoJSON` uses English field names (`magnitude`, `time`, `place`, ...) mirroring the USGS schema; they are snake_case but not Spanish (ADR-0009). | `domain/models.py` |
 | **Mock provider** | Returns a fixed draft but cites the first `<source_data id=...>` found in the prompt, so strict citation checks work offline. | `adapters/llm/mock_adapter.py` |
+| **Incomplete decisions** | Cloudflare/Jev validate that every requested question has an answer of the required type; incompatible payloads use a mock fallback. The contradiction service rejects a missing or mistyped `NoulAnswer` instead of declaring consistency. Actual numeric zero remains valid. | `tests/test_decision_adapters.py`, ADR-0026 |
+| **Quarantined agenda evidence** | A cluster whose titles all trigger the injection detector has zero usable evidence, empty claims and `INSUFICIENTE` state. Source IDs and excerpts remain available for inspection; high decision scores cannot enable a draft. This is a pattern-based guard, not a universal detector or truth verdict. | `tests/test_domain_invariants.py`, ADR-0027 |
 
 ### Operational gotchas
 - **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.

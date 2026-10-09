@@ -92,7 +92,7 @@ El puntaje de atención $P$ es independiente del estado de evidencia. Un caso pu
 | :--- | :--- | :--- |
 | **Rol** | Evaluar $R, I, U, N, E$ y detectar contradicciones factuales (T05). | Redactar borradores editoriales, guiones de TV y justificaciones analíticas. |
 | **Adaptadores** | `CloudflareClefAdapter` (`@cf/cloudflare/clef`), `JevAdapter`, `MockDecisionAdapter`. | `OpenCodeAdapter` (`muse-spark-1.3`), `GeminiAdapter` (`gemini-2.5-flash`), `MockLLMAdapter`. |
-| **Naturaleza** | Estructurada, determinista, baja latencia (< 50 ms), salida numérica o booleana. | Generación de lenguaje natural con citas embebidas y cumplimiento de longitudes. |
+| **Naturaleza** | Preguntas tipadas y salida numérica o booleana; diez llamadas Jev medidas en el reporte de validación. | Generación estructurada; las citas y longitudes se comprueban después de generar. |
 | **Resiliencia** | Fallback automático a heurísticas locales si el token no está configurado. | Fallback automático a `MockLLMAdapter` para operación 100% offline (T10). |
 
 ---
@@ -120,8 +120,26 @@ Los textos de noticias externas, cables de agencias y feeds RSS se consideran **
 1. **Límites de Longitud Editorial**:
    - TVN Brief: Máximo 250 palabras.
    - Copy Digital: Máximo 80 palabras.
-   - Guion Televisivo: Cadencia de 45 a 60 segundos (aproximadamente 110-150 palabras habladas).
+   - Guion Televisivo: 113–150 palabras habladas a 150 palabras/minuto para 45–60 segundos; ritmo configurable.
 2. **Atribución ante Metadatos Únicos**:
    - Si una noticia sólo contiene titular o metadatos sin cuerpo desarrollado, el borrador incluye explícitamente la cláusula: `"basado únicamente en titular/metadatos"`.
 3. **Reserva Humana Absoluta**:
    - La IA nunca decide de forma autónoma la veracidad de una información ni aprueba borradores para emisión directa.
+
+## Identificación pública de ejecución y prompts
+
+Los conectores no prueban por sí solos uso sustantivo de IA. La generación de borradores se implementa
+con `generate_structured`; la búsqueda general devuelve extractos o abstención (ADR-0025). El fallback
+mock usa reglas y plantillas y debe mostrarse como tal.
+
+La versión reproducible de los prompts es el commit del repositorio más los bloques de construcción
+en `CopilotService`: priorización, `detect_contradictions`, `generate_tvn_editorial_package` y
+`generate_banking_bulletin`. Los datos dinámicos se aíslan y escapan en `<source_data>`. El contrato de
+salida está en los modelos Pydantic; no confundir esta estructura con prueba de sustento semántico.
+
+Registrar en cada ensayo el commit, corpus/manifiesto, proveedor/modelo efectivos y parámetros públicos.
+Los valores por defecto vigentes se consultan en `config.py`: Jev para decisión (`jev-1.13-free`),
+OpenCode para generación (`muse-spark-1.3-contributor`), concurrencia 5; temperatura estructurada 0.1.
+La configuración efectiva puede cambiar estos valores; no copiar claves ni `.env` a Notion o capturas.
+El benchmark informa la atribución efectiva de contradicciones y sus fallbacks. Tokens/costo no medidos
+se declaran pendientes, y latencias mock no se atribuyen a modelos remotos.

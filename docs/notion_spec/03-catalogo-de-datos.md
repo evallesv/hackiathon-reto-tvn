@@ -1,134 +1,99 @@
-# 03 — Catálogo de Datos y Manifiesto de Integridad
+# 03 — Catálogo de Datos y Manifiestos de Integridad
 
-> **Espacio Oficial de Presentación en Notion Business**  
-> **Catálogo de Fuentes, Esquemas, Licencias y Manifiesto Criptográfico SHA-256**
+> Contenido local preparado para Notion Business. Publicación y revisión del catálogo en el espacio real pendientes.
 
----
+## 1. Finalidad de los conjuntos y su relación
 
-## 1. Visión General de las Fuentes de Datos
+| Conjunto | Ubicación | Uso y límites |
+| :--- | :--- | :--- |
+| Corpus de referencia histórico | `data/raw/` y `data/manifest.json` | Pruebas controladas y benchmark de desarrollo reproducible. Incluye casos históricos; no representa la agenda de hoy ni acredita por sí solo los mínimos de volumen del paquete propuesto. |
+| Snapshot local de demostración | `data/snapshot/snapshot.sqlite` y `snapshot_manifest.json` | Corpus consultable sin servidor ni red. Empaqueta el corpus de referencia y la ingesta local disponible al corte; se abre en modo de solo lectura. Incluye noticias, indicadores y eventos, excluyendo revisiones y bitácoras operativas. |
+| Base operativa | `data/storage/copilot.db` o volumen persistente | Ingesta periódica y revisión editorial mutable. Puede aportar datos a una nueva versión del snapshot. La agenda usa una ventana retrospectiva configurable de 90 días por defecto. |
+| Consultas de evaluación | `data/benchmark.jsonl` | Cuarenta consultas de desarrollo; veinte etiquetas reservadas expuestas en el repositorio, que no constituyen evaluación ciega. Un holdout nuevo requiere custodia externa y revisión humana. |
 
-El sistema integra 4 orígenes de información heterogéneos, categorizados en dos capas operativas:
-1. **Capa Benchmark / Snapshot Congelado**: Almacenada en `data/raw/` y sellada criptográficamente en `data/manifest.json` para garantizar reproducibilidad exacta al 100%.
-2. **Capa de Ingesta Continua (Live Feeds)**: Almacenada en SQLite WAL (`copilot.db`), con conectores programados para actualización periódica.
+Las noticias permiten descubrir temas y atribuir lo reportado. Los indicadores aportan contexto anual comparable; los eventos USGS respaldan exclusivamente hechos sísmicos. Solo se relacionan cuando existe pertinencia sustentada: una coincidencia geográfica no demuestra causalidad ni pérdidas económicas.
 
----
+El snapshot SQLite satisface la necesidad técnica de consultas locales reproducibles cuando su versión, contenido y hashes están declarados. No equivale a datos de entrenamiento ni aporta por sí solo etiquetas de validación. La evaluación usa el corpus declarado, separado de revisiones humanas y etiquetas reservadas.
 
-## 2. Catálogo Detallado de Fuentes
+## 2. Fuentes y contrato mínimo
 
-### 2.1. Fuente 1: TVN RSS Panamá (Noticias Nacionales)
-- **Tipo de Origen**: Feed XML RSS público de medios informativos nacionales.
-- **Endpoint / URL Base**: `https://www.tvn-2.com/rss/` y sitios aliados de prensa.
-- **Formato**: CSV tabular normalizado (`noticias.csv`).
-- **Cobertura Temporal**: Eventos noticiosos de 2022 a 2024 (incluye deliberadamente noticias históricas para verificar el detector de recirculación T03).
-- **Cobertura Geográfica**: República de Panamá (Ciudad de Panamá, Provincias Centrales, Canal de Panamá).
-- **Esquema de Campos**:
-  - `id_noticia` (`TEXT`): Identificador único (e.g. `NOT-001`).
-  - `titulo` (`TEXT`): Titular periodístico.
-  - `url` (`TEXT`): Enlace canónico de la fuente.
-  - `medio` (`TEXT`): Nombre del medio emisor (TVN Noticias, Panamá América, La Estrella).
-  - `idioma` (`TEXT`): Código ISO `es`.
-  - `fecha_publicacion` (`TEXT ISO8601`): Fecha oficial declarada de emisión.
-  - `fecha_deteccion` (`TEXT ISO8601`): Marca temporal de captura en el sistema.
-  - **GDELT**: `seendate` se conserva como `fecha_deteccion`; no se usa como fecha de publicación. Si no se verifica por separado, `fecha_publicacion` queda vacía.
-  - `fecha_extraccion` (`TEXT ISO8601`): Fecha de procesamiento por el loader.
-  - `tema` (`TEXT`): Categoría temática (`infraestructura`, `logistica`, `salud`, `clima`).
-  - `origen` (`TEXT`): Origen técnico (`tvn_rss`, `gdelt`, etc.).
-  - `alcance_texto` (`TEXT`): `titular_metadatos` o `cuerpo_completo`.
-  - `resumen` (`TEXT`): Extracto informativo.
-  - `metadata` (`JSON`): Metadatos adicionales (entidades, tags).
-- **Licencia y Términos**: Derechos de autor reservados TVN / Medios panameños. Uso referencial exclusivo para investigación y evaluación en el marco del HackIAthon.
+### TVN RSS y metadatos de noticias
 
-### 2.2. Fuente 2: GDELT DOC 2.0 (Global Database of Events, Language, and Tone)
-- **Tipo de Origen**: API global de eventos y noticias.
-- **Query de Consulta**: `Panama AND (logistica OR turismo OR economia OR canal)`.
-- **Formato**: Ingesta JSON & CSV.
-- **Cobertura Geográfica**: Centroamérica y cuenca del Canal.
-- **Licencia**: Dominio público / Uso abierto de investigación académica.
+* **Fuente**: TVN Panamá, `https://www.tvn-2.com/rss/`; conservar la URL canónica y el medio de cada registro.
+* **Contrato**: `id_noticia`, `titulo`, `url`, `medio`, `idioma`, `fecha_publicacion`, `fecha_deteccion`, `fecha_extraccion`, `tema`, `origen`, `alcance_texto`; otros campos se describen en los contratos del repositorio.
+* **Ventana propuesta por el PDF**: 30 días previos a la extracción, ampliables a 90 si falta volumen; meta de 200 registros únicos y mínimo operativo de 100 con al menos 20 de TVN. Registrar las fechas efectivas, no asumir que RSS conserva todo el histórico. La operación configurada del proyecto conserva una ventana de 90 días y distingue los fixtures históricos.
+* **Derechos**: los titulares y enlaces son el punto de partida. El patrocinio no concede derechos de republicación de artículos, imágenes o videos. Extractos o cuerpos completos requieren condiciones aplicables o autorización; registrar su alcance y no simular lectura del artículo completo.
 
-### 2.3. Fuente 3: Banco Mundial Open Data (Indicadores Macroeconómicos)
-- **Tipo de Origen**: API REST v2 de indicadores mundiales.
-- **Endpoint**: `https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json`
-- **Indicadores Clave Extraídos**:
-  - `NY.GDP.MKTP.KD.ZG`: Crecimiento del PIB (% anual).
-  - `FP.CPI.TOTL.ZG`: Inflación, precios al consumidor (% anual).
-  - `SL.UEM.TOTL.ZS`: Desempleo total (% de la fuerza laboral).
-  - `BX.KLT.DINV.WD.GD.ZS`: Inversión Extranjera Directa (% del PIB).
-  - `GC.DOD.TOTL.GD.ZS`: Deuda pública (% del PIB).
-  - `FM.LBL.BMNY.GD.ZS`: Masa monetaria amplia (% del PIB).
-- **Países en Catálogo**: Panamá (`PAN`) como foco principal; pares regionales de referencia: Costa Rica (`CRI`), Colombia (`COL`), República Dominicana (`DOM`), México (`MEX`), Guatemala (`GTM`).
-- **Formato**: CSV tabular (`indicadores.csv`).
-- **Licencia**: Creative Commons Attribution 4.0 International (CC BY 4.0). Requiere cita explícita de fuente y año.
+### GDELT DOC 2.0
 
-### 2.4. Fuente 4: USGS Earthquake Catalog (Eventos Sísmicos)
-- **Tipo de Origen**: GeoJSON API de monitoreo sísmico mundial.
-- **Bounding Box Geoespacial**: Latitudes `[5.0, 12.0]`, Longitudes `[-86.0, -76.0]` (zona de convergencia Panamá-Colombia-Costa Rica).
-- **Formato**: FeatureCollection GeoJSON estándar (`eventos.geojson`).
-- **Propiedades Clave**:
-  - `mag`: Magnitud en escala de Richter o momento sísmico.
-  - `place`: Descripción geográfica de referencia.
-  - `time`: Timestamp Unix en milisegundos.
-  - `geometry.coordinates`: `[longitud, latitud, profundidad]`.
-- **Licencia**: Dominio público de los Estados Unidos (U.S. Geological Survey).
+* **Fuente**: `https://api.gdeltproject.org/api/v2/doc/doc`; la receta debe registrar consultas efectivas, filtros, intervalos y fecha de extracción.
+* **Uso previsto**: búsqueda de Panamá y temas de logística, turismo, economía y eventos naturales; dividir por fechas y deduplicar por URL. El límite de 250 artículos por consulta del PDF obliga a detectar truncamiento; los errores o reintentos no prueban que la cobertura se haya completado.
+* **Marcas temporales**: `seendate` indica detección y se guarda como `fecha_deteccion`; no es una fecha de publicación. Si no existe una fecha de publicación verificada, conservar el nulo.
+* **Derechos**: acceso a la API no transfiere derechos de los medios enlazados. No calificar todos los artículos como dominio público ni redistribuir contenido protegido por ese motivo.
 
----
+### Banco Mundial — seis series oficiales comparables
 
-## 3. Políticas de Transformación y Calidad del Dato
+* **Fuente**: `https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json`.
+* **Países**: `PAN`, `CRI`, `COL`, `DOM`, `MEX`, `GTM`.
+* **Períodos de referencia**: 2010–2024 inclusive. El año del dato se conserva separado de la fecha de extracción y no se presenta como medición actual.
 
-1. **Conservación Estricta de Nulos (T01 & T04)**:  
-   Cuando un indicador o fecha no está disponible en la fuente de origen, el sistema almacena `None` / `null`. **Queda terminantemente prohibido imputar ceros (`0.0`) a valores faltantes**, para evitar distorsionar el cálculo de variaciones o alertar sobre datos inexistentes.
-2. **Tolerancia a Fechas No Parseables**:  
-   Si una noticia contiene una cadena de fecha mal formada o un valor no estándar, el loader no arroja una excepción fatal; preserva el valor original en los metadatos y establece el campo estructurado como `None`.
-3. **Detección de Recirculación de Noticias Antiguas (T03)**:  
-   Si un artículo reporta un evento con fecha de publicación original de años anteriores (e.g. mayo de 2022) que es republicado en 2024, el sistema preserva la marca original y etiqueta la ficha con la advertencia de recirculación para evitar que sea tratada como un suceso de última hora.
-4. **Sanitización de Inyecciones de Prompt (T07)**:  
-   Todo texto proveniente de fuentes externas se encapsula en contenedores `<source_data>` y se desinfecta de patrones de secuestro de instrucciones antes de ser suministrado a los modelos de lenguaje.
+| Indicador | Significado | Unidad de referencia |
+| :--- | :--- | :--- |
+| `NY.GDP.MKTP.KD.ZG` | Crecimiento del PIB | % anual |
+| `FP.CPI.TOTL.ZG` | Inflación, precios al consumidor | % anual |
+| `SL.UEM.TOTL.ZS` | Desempleo total | % de la fuerza laboral |
+| `SP.POP.TOTL` | Población total | Personas |
+| `IT.NET.USER.ZS` | Uso de internet | % de la población |
+| `NE.EXP.GNFS.ZS` | Exportaciones de bienes y servicios | % del PIB |
 
----
+* **Contrato**: `pais_iso3`, `indicador_id`, `anio`, `valor` nullable, `unidad`, `fuente_url`, `fecha_extraccion`, `licencia`.
+* **Cuadrícula**: seis países × seis indicadores × quince años = **540 combinaciones**. El PDF dice 1.350, cifra incompatible con sus dimensiones; documentar la discrepancia y solicitar aclaración organizativa, sin inventar observaciones. La cuadrícula completa puede contener nulos y no implica 540 valores publicados.
+* **Condiciones**: atribución bajo CC BY 4.0 como regla general del documento, comprobando excepciones de terceros en metadatos. Conservar unidades originales y posibles revisiones de la fuente.
 
-## 4. Manifiesto Criptográfico Oficial (`data/manifest.json`)
+### USGS — eventos sísmicos oficiales
 
-El archivo `data/manifest.json` constituye la prueba de inmutabilidad del corpus de referencia:
+* **Fuente**: catálogo USGS, `https://earthquake.usgs.gov/fdsnws/event/1/query` y URL oficial de cada evento.
+* **Contrato**: `id`, `magnitude`, `time`, `updated`, `longitude`, `latitude`, `depth`, `place`, `status`, `url`; la ingesta GeoJSON conserva coordenadas y propiedades de origen.
+* **Extracción propuesta por el PDF**: del 01/01/2024 al 31/12/2024 inclusive, latitud 5–12, longitud −86 a −76, magnitud mínima 3; conservar todos los eventos devueltos sin fijar un volumen ficticio. El paquete distingue `eventos` del corpus histórico y `eventos_vivos` de ingesta posterior.
+* **Alcance**: la caja regional no equivale al territorio panameño. Mantener lugar, fecha y magnitud; no usar un sismo como evidencia de inundaciones, afectación económica o exposición de una cartera.
+* **Condiciones**: datos públicos USGS conforme a las condiciones aplicables, verificando posibles elementos de terceros. Registrar la URL y condiciones del material concreto reutilizado.
 
-```json
-{
-  "version": "v1.0",
-  "fecha_corte_utc": "2026-10-06T20:00:40.206271+00:00",
-  "consultas": [
-    "TVN RSS Panama",
-    "GDELT DOC 2.0 Panama logistica turismo economia",
-    "World Bank Indicators (PAN, CRI, COL, DOM, MEX, GTM)",
-    "USGS Earthquake Catalog Box [5,12] [-86,-76]"
-  ],
-  "cantidad_por_archivo": {
-    "noticias.csv": 10,
-    "indicadores.csv": 14,
-    "eventos.geojson": 3
-  },
-  "licencia_condiciones": "Ver licencias específicas por archivo en items. Uso exclusivo hackIAthon.",
-  "archivos": [
-    {
-      "archivo": "raw/noticias.csv",
-      "cantidad_registros": 10,
-      "licencia": "Derechos de autor TVN/GDELT - Uso referencial",
-      "sha256": "e74363790a311bc626aca4c0b3252d86a5987f3056f8104062fe193abda8d7e4",
-      "transformaciones": "Deduplicación y normalización UTC"
-    },
-    {
-      "archivo": "raw/indicadores.csv",
-      "cantidad_registros": 14,
-      "licencia": "CC BY 4.0 (Banco Mundial / SBP)",
-      "sha256": "0a9776ea862e7bcbcb8482e8933654ab6a855166bcfe4a576eb987e004de3b58",
-      "transformaciones": "Conservación de nulos y tipos numéricos"
-    },
-    {
-      "archivo": "raw/eventos.geojson",
-      "cantidad_registros": 3,
-      "licencia": "Dominio público (USGS)",
-      "sha256": "1d0a27d3c56127f3bdcddd5c2315c1aff2442c5e78d342cf9e54d634cb85b6a2",
-      "transformaciones": "Filtrado regional lat 5-12, lon -86 a -76"
-    }
-  ]
-}
+### Extensión bancaria opcional
+
+El PDF propone doce informes mensuales de la SBP de 2024 o un período de doce meses documentado, con unidad, período y página. El proyecto no acredita esa recopilación en este catálogo. No se declara como fuente utilizada ni como requisito satisfecho; la modalidad editorial no exige dos productos completos. El boletín de entorno puede usar fuentes declaradas sin inferir impagos, pérdidas o exposición de clientes inexistentes.
+
+## 3. Calidad, transformaciones y procedencia
+
+1. Conservar nulos, fechas originales, unidades y país/año. Una identidad ausente o malformada permanece ausente; no crear cifras o claves por defecto.
+2. Validar IDs, URLs, campos obligatorios y fechas; registrar filas excluidas, errores y transformaciones. Una fecha no parseable no debe bloquear toda la carga.
+3. Deduplicar URLs y agrupar eventos sin convertir repetición de una agencia en corroboración independiente. Las agrupaciones léxicas son heurísticas, no una resolución semántica verificada de todos los eventos.
+4. Separar fecha de publicación, detección y extracción. Los contratos usan UTC; la interfaz debe mostrar hora de Panamá e identificar la fecha del dato y su alcance temporal.
+5. Tratar textos externos como datos no confiables en los prompts. Los controles y pruebas cubren patrones concretos; no acreditan inmunidad universal a inyección.
+6. Vincular cada afirmación a un ID y campo, pasaje o página pertinente. Resolver un ID o una URL no demuestra soporte semántico: requiere comprobar el pasaje y mantener revisión humana.
+
+## 4. Evidencias del paquete y actualización del catálogo
+
+Las fechas, recuentos, consultas, transformaciones y hashes se toman de los archivos vigentes; no se reproduce aquí un manifiesto copiado que pueda quedar desactualizado:
+
+* `data/manifest.json`: versión, fecha de corte, consultas, recuentos, condiciones, SHA-256 y transformaciones de `data/raw/`.
+* `data/snapshot/snapshot_manifest.json`: fecha de corte, SHA-256 del SQLite, hash del manifiesto de origen, tablas incluidas/excluidas, recuentos y valores presentes/nulos de la cuadrícula.
+* [Diccionario de datos](../DATA_DICTIONARY.md): campos, tipos, nulos, unidades, esquema del snapshot y diferencias de la base operativa, derivados de los contratos actuales. Incluye las limitaciones de conservación de nulos de USGS.
+* Informe de auditoría y receta de adquisición: cobertura efectiva, errores de fuentes y límites de completitud. Un hash garantiza identidad de archivo, no autenticidad ni validez factual de su contenido.
+
+Para auditar la carpeta de referencia sin modificarla:
+
+```bash
+make audit-snapshot SNAPSHOT_DIR=data
 ```
 
-El comando `make manifest` permite verificar y recalcular estos hashes en cualquier momento para certificar la integridad del entorno.
+Ese comando audita la carpeta CSV/GeoJSON indicada; no debe presentarse como auditoría automática del paquete SQLite ampliado. Las dos versiones pueden tener coberturas diferentes y sus resultados se documentan por separado.
+
+`make sqlite-snapshot` construye el paquete usando la receta del repositorio y valida el manifiesto de origen; no modifica los archivos congelados. Si ya existe el destino, la herramienta exige una ruta nueva para conservar la versión anterior:
+
+```bash
+uv run python scripts/build_sqlite_snapshot.py --output-dir /private/tmp/snapshot-v2
+```
+
+`make manifest` **regenera** el manifiesto y no se utiliza como simple verificación de un corpus que deba permanecer inmutable.
+
+Antes de publicar este catálogo en Notion, adjuntar el manifiesto efectivo, la receta, el diccionario y las condiciones por fuente; registrar quién los revisó y las limitaciones pendientes. La publicación y esa revisión están pendientes.

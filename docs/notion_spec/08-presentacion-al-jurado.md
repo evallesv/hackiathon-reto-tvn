@@ -1,90 +1,80 @@
-# 08 — Guión de Presentación Oficial al Jurado (Pitch de 10 Minutos)
+# 08 — Presentación al Jurado desde Notion
 
-> **Espacio Oficial de Presentación en Notion Business**  
-> **Estructura Cronometrada, Guión Verbal, Demostración en Vivo y Respuestas Clave ante el Jurado**
+> Contenido local preparado. Publicación, acceso del jurado y ensayo desde Notion pendientes.
 
----
+## 1. Recorrido de diez minutos
 
-## 1. Estructura y Cronograma del Pitch (10 Minutos)
+El pitch parte de la página «Presentación al jurado» en Notion y navega por las páginas de trabajo. Se permiten enlaces o embeds al prototipo y GitHub. Un dashboard, PDF o presentación de diapositivas por separado no sustituye este recorrido.
 
-| Bloque Temporal | Sección | Objetivo Principal | Pantalla / Recurso a Proyectar |
-| :---: | :--- | :--- | :--- |
-| **0:00 – 1:30** (1.5 min) | **1. El Dolor en TVN Media** | Plantear el conflicto entre velocidad de primicia y rigor editorial; el peligro de las alucinaciones de la IA. | Diapositiva 1 / Dashboard Header |
-| **1:30 – 3:00** (1.5 min) | **2. Arquitectura de Decisión** | Explicar la Arquitectura Hexagonal y la segregación System One (Decisión rápida) vs System Two (LLM explicativo). | Diagrama C4 / Fórmula de Atención $P$ |
-| **3:00 – 6:30** (3.5 min) | **3. Demostración en Vivo** | Recorrido interactivo por las 4 vistas del dashboard: Agenda, Ficha, Consola del Jurado y Métricas. | **Dashboard Web en Vivo (`http://localhost:8080`)** |
-| **6:30 – 8:00** (1.5 min) | **4. Benchmark y Baselines** | Mostrar resultado exploratorio, baseline, tamaño de muestra y limitaciones; presentar resultados de IA solo si se verifican antes del pitch. | Vista 4 / Gráficos de Evaluación |
-| **8:00 – 9:00** (1.0 min) | **5. Ética y Guardrails** | Destacar el guardrail T08, anti-inyección T07 y supervisión humana obligatoria. | Guardrail Alert T08 / Modal de Revisión |
-| **9:00 – 10:00** (1.0 min) | **6. Impacto y Cierre** | Retorno de inversión para TVN Media, extensión bancaria y despliegue productivo. | Conclusión / Preguntas y Respuestas |
+| Tiempo | Contenido | Página de Notion y evidencia |
+| :--- | :--- | :--- |
+| 0:00–1:00 | Problema, usuario y valor para TVN | Inicio del reto: editor que debe escoger temas investigables y preparar borradores. |
+| 1:00–2:00 | Solución, alcance y datos públicos | Catálogo de datos: identificar el snapshot de demo, su corte, procedencia y hash. |
+| 2:00–6:00 | Demo: consulta útil, ficha con citas, borrador y abstención | Casos y evidencias → enlace al prototipo; registrar la revisión del borrador. |
+| 6:00–8:00 | Arquitectura, capacidad IA, baseline y métricas observadas | Diseño de solución y Pruebas y métricas: proveedor efectivo, resultados y un fallo/corrección reales. |
+| 8:00–9:00 | Valor operativo medido o hipótesis identificada | Inicio del reto: objetivo de reducir búsqueda y comprobación; declarar si falta ensayo manual frente a asistido. |
+| 9:00–10:00 | Riesgos, limitaciones y próximos pasos | Riesgos y ética y Plan y decisiones: controles, tareas pendientes y reserva humana. |
 
----
+Añadir cinco minutos para preguntas del jurado, según la sección 11 del PDF.
 
-## 2. Guión Verbal Paso a Paso para los Expositores
+## 2. Guion y acciones del expositor
 
-### Minuto 0:00 – 1:30: El Problema en la Redacción
-> *"Muy buenos días, señores miembros del jurado. En la era digital, las salas de redacción como la de TVN Media no sufren por falta de información, sino por infoxicación. Cada día llegan miles de cables, alertas en redes y comunicados oficiales.  
-> La presión por ganar la primicia induce dos grandes riesgos: difundir noticias falsas o recirculadas de años anteriores, y peor aún, si intentamos usar IA generativa comercial sin control, los modelos alucinan cifras y fuentes inventadas.  
-> Por eso hoy presentamos el **Copiloto de Inteligencia Informativa de TVN Media**: un sistema diseñado para transformar la señal cruda en decisiones editoriales seguras, trazables y auditables."*
+### 0:00–1:00 — Problema y usuario
 
----
+«Nuestro usuario es un editor de TVN. Debe encontrar temas relevantes entre fuentes dispersas, distinguir repetición de corroboración y decidir qué falta investigar. El copiloto organiza esas señales, muestra la evidencia disponible y prepara un borrador para una decisión humana.»
 
-### Minuto 1:30 – 3:00: La Solución Arquitectónica
-> *"Nuestra solución se apoya en dos pilares arquitectónicos:  
-> Primero: **Arquitectura Hexagonal Pura**, donde las reglas de negocio no dependen de proveedores comerciales ni requieren conexión a internet para operar de forma 100% determinista.  
-> Segundo: **Segregación de Sistemas cognitivos**:  
-> Usamos un **System One** (modelos de decisión de ultrabaja latencia como Cloudflare Clef o Jev) para clasificar señales y priorizar la agenda en menos de un milisegundo mediante una fórmula matemática explicable:  
-> $$P = 30\% \text{ Relevancia} + 25\% \text{ Impacto} + 20\% \text{ Urgencia} + 15\% \text{ Novedad} + 10\% \text{ Evidencia}$$  
-> Y reservamos el **System Two** (modelos generativos como OpenCode Muse-Spark o Gemini) exclusivamente para redactar borradores finales cuando —y sólo cuando— la evidencia está plenamente verificada."*
+Mostrar usuario y alcance en «Inicio del reto». No atribuir ahorros, audiencia o resultados financieros que no se hayan medido.
 
----
+### 1:00–2:00 — Solución y datos
 
-### Minuto 3:00 – 6:30: Demostración en Vivo en el Dashboard
+«Usamos noticias públicas y series oficiales. Los titulares ayudan a descubrir temas; los indicadores aportan contexto anual y USGS respalda hechos sísmicos. El snapshot SQLite contiene el corpus local de demostración y permite consultar sin internet. La base operativa almacena ingesta y revisiones. Los períodos históricos permanecen visibles y no se describen como cifras de hoy.»
 
-*(El expositor proyecta el Dashboard en `http://localhost:8080/`)*
+Abrir «Catálogo de datos» y el manifiesto efectivo. Identificar corpus, corte y versión usados en el ensayo. Explicar la diferencia entre el corpus histórico del benchmark y el snapshot ampliado, si ambos se utilizan.
 
-#### Paso 1: Vista 1 — Agenda Priorizada & Guardrail T08
-> *"Veamos el sistema en acción. Aquí en la **Vista 1: Agenda Priorizada**, observamos el ranking en tiempo real. Fíjense en la tarjeta de la Autoridad del Canal de Panamá (`CASO-002`), que encabeza la agenda con un puntaje de **84.2**. Aquí el sistema unificó cuatro despachos distintos sobre el mismo suceso en una sola procedencia (cumpliendo el test **T02**).  
-> Pero miren esta alerta roja en la parte superior: el caso `CASO-005` es un rumor viral con alto impacto y urgencia que acumula un puntaje de 83.8; sin embargo, su evidencia es insuficiente. Aquí opera nuestro **Guardrail T08**: la IA bloquea automáticamente la generación del borrador y le dice al periodista: 'Investigue primero, prohibido publicar'."*
+### 2:00–6:00 — Demostración de extremo a extremo
 
-#### Paso 2: Vista 2 — Fichas de Caso, Citas y Control Humano
-*(Hacer clic en la tarjeta de `CASO-001` - Obras Viales del MOP)*
-> *"Al ingresar a la **Ficha de Caso**, vemos las afirmaciones estructuradas por tipo (hecho, declaración o inferencia). El control estricto comprueba que sus IDs y fragmentos citados existan y que los términos de contenido estén presentes en el pasaje. Es una validación léxica conservadora: no prueba que cada oración libre esté representada ni demuestra implicación semántica. Por eso el borrador permanece en revisión humana.
-> El copiloto genera automáticamente el **Brief Editorial de menos de 250 palabras**, el **Guion de televisión de 45 a 60 segundos**, el **Copy para redes de 80 palabras** y 3 preguntas clave de investigación ciudadana.  
-> Y respetamos el principio de **Human-in-the-Loop**: el borrador está en estado 'En Revisión'. Ninguna noticia sale al aire sin que un editor humano haga clic en 'Aprobar Borrador' registrando su nombre y notas."*
+1. Desde «Casos y evidencias», abrir el prototipo y consultar cinco temas para la agenda. Mostrar componentes de `P = 30R + 25I + 20U + 15N + 10E`, urgencia y vacíos de verificación. Usar los IDs y puntajes de la ejecución, evitando valores fijos tomados de fixtures históricos.
+2. Abrir una ficha económica y una fuente oficial pertinente. Consultar una cifra anual presente en el corpus del ensayo, mostrando país, año, unidad, ID y pasaje/campo de origen. Si solo existen titulares, señalar «basado únicamente en titular/metadatos». No forzar una relación causal entre noticia e indicador.
+3. Generar un borrador permitido por el estado de evidencia. Mostrar brief de hasta 250 palabras, tres preguntas, guion de 45–60 segundos y copy de hasta 80 palabras. Explicar las comprobaciones automáticas efectivas y lo que sigue requiriendo revisión humana. Aprobar como borrador no publica una noticia.
+4. Registrar una revisión real con persona responsable y notas; crear o actualizar manualmente la ficha correspondiente en Notion. Si no hay revisor disponible en el ensayo, dejar la revisión pendiente. Los nombres y aprobaciones de fixtures no cuentan como evidencia humana.
+5. Hacer una pregunta cuya respuesta no exista en el corpus. Mostrar abstención explícita y qué información falta. Abrir también el caso de prioridad alta con evidencia insuficiente: la prioridad exige investigación y no habilita publicación.
 
-#### Paso 3: Vista 3 — Consola Interactiva del Jurado
-*(Hacer clic en la pestaña 'Consola del Jurado')*
-> *"Invitamos al jurado a someter a prueba el sistema. Tenemos botones de prueba inmediata:  
-> - Si presionamos **[T04]**, el sistema consulta el PIB y la inflación de Panamá 2023: extrae de inmediato el 7.3% y 1.5% del Banco Mundial con cita al indicador oficial.  
-> - Si presionamos **[T06]**, la consulta de prueba sobre ingresos turísticos de 2029 que no están en el corpus recibe una **Abstención Explícita**. Esto valida ese escenario; no prueba ausencia general de alucinaciones.
-> - Si presionamos **[T07]**, el payload de inyección de prueba se neutraliza y se trata como dato. La prueba cubre patrones concretos, no todos los ataques posibles.
-> - Y con el **Detector de Contradicciones (T05)**, comparamos dos versiones sobre el calado del Canal y el modelo System One detecta la inconsistencia side-by-side en milisegundos."*
+Si aparece una contradicción, presentar ambas versiones, fechas y alcance sin escoger arbitrariamente. Con varias publicaciones, mostrar procedencia y explicar que repetir una agencia no crea fuentes independientes.
 
----
+### 6:00–8:00 — IA y evaluación
 
-### Minuto 6:30 – 8:00: Validación Científica y Resultados del Benchmark
-*(Hacer clic en la pestaña 'Métricas & Benchmark')*
-> *"Tenemos 40 consultas de desarrollo ejecutables. Las 20 etiquetas reservadas quedaron dentro del repositorio y no son ciegas, así que el runner las excluye y necesitamos custodia independiente para evaluar al jurado. El benchmark corre sobre `data/raw/` verificado por manifiesto, separado del snapshot de demostración. Las 20 consultas sustentadas coincidieron con el valor principal y el ID de fuente esperados (20/20) bajo `mock`; es coincidencia literal del conjunto de desarrollo, no revisión semántica independiente. En P@5 obtuvimos 1 de 5 por recencia y 2 de 5 con la fórmula (+100% exploratorio, etiquetas por palabras clave). En diez pares sintéticos, Macro-F1 fue 0.792 para regex y 0.524 para el adaptador mock."*
+«Separamos las reglas de dominio de los adaptadores de decisión y generación. Mostramos aquí el proveedor y modelo realmente utilizados. El modo mock permite ensayar el flujo offline; su latencia y sus reglas no acreditan desempeño de un modelo remoto ni una capacidad NLP sustantiva. La contribución de IA debe demostrarse con una ejecución identificada y comparada contra un baseline.»
 
----
+Abrir «Diseño de solución» con versiones, prompts y parámetros públicos, y «Pruebas y métricas» con la última salida de `make check` y del benchmark. Informar entorno, numerador, denominador y fallos; distinguir IDs resolubles, coincidencia literal y revisión humana de soporte. La comparación actual por palabras clave es exploratoria mientras no exista selección independiente de un editor.
 
-### Minuto 8:00 – 9:00: Ética, Gobernanza y Extensión Banca (CU-05)
-> *"En materia ética, el sistema está blindado: respeta los derechos de autor de TVN y las licencias CC BY 4.0 del Banco Mundial. Nunca imputa ceros a datos faltantes (T01) y nunca toma decisiones autónomas de calificación.  
-> Además, demostramos la modularidad de nuestra arquitectura en el caso `CASO-004`, donde el mismo motor genera un **Boletín Macroeconómico y Logístico para analistas de riesgo bancario**, conectando el PIB y los embalses del Canal con el entorno sectorial."*
+Las etiquetas reservadas expuestas en el repositorio no son ciegas. Una evaluación independiente requiere un conjunto nuevo bajo custodia externa. Mostrar tokens y costo medidos si existen; si no, declarar que no se midieron. No atribuir latencias mock a los proveedores comerciales.
 
----
+Mostrar en Notion una prueba fallida real y su corrección, con evidencia reproducible. Si no está documentada todavía, marcarla pendiente y completarla antes del cierre; no inventar resultados.
 
-### Minuto 9:00 – 10:00: Conclusión e Impacto de Negocio
-> *"En resumen: hemos construido una solución productiva, desplegada en Fly.io con persistencia en SQLite WAL, con 80 pruebas automatizadas pasando al 100%, y una interfaz pensada para el ritmo frenético de una sala de redacción.  
-> El Copiloto de TVN Media permite a los periodistas llegar primero, pero sobre todo, **llegar con la verdad verificada**.  
-> Muchas gracias. Quedamos a su disposición para las preguntas del jurado."*
+### 8:00–9:00 — Valor operativo
 
----
+«Nuestra hipótesis de valor es reducir el tiempo que un editor dedica a buscar fuentes, reconocer vacíos y preparar una primera pieza. Para medirla debemos comparar una tarea equivalente manual y asistida, registrando número de pruebas y tiempo. Mientras ese ensayo no exista, presentamos el valor como hipótesis.»
 
-## 3. Guía de Respuestas a Posibles Preguntas del Jurado
+Si se realizó el ensayo, mostrar su método y resultados efectivos. No inferir aumento de audiencia, rentabilidad o reducción del riesgo bancario con estos datos.
 
-1. **¿Qué ocurre si se cae el servicio de internet o la API de OpenCode durante la emisión en vivo?**  
-   *Respuesta*: *"El sistema cuenta con el adaptador `MockLLMAdapter` y `MockDecisionAdapter` como fallback automático y transparente. El sistema sigue priorizando la agenda, validando citas y generando paquetes editoriales con datos locales sin detener la redacción (cumplimiento del criterio T10)."*
-2. **¿Por qué la IA no dice directamente si una noticia es Verdadera o Falsa?**  
-   *Respuesta*: *"Porque etiquetar de forma binaria 'Verdadero/Falso' introduce falsos positivos peligrosos y delega la responsabilidad editorial en un algoritmo. Nuestro copiloto proporciona la evidencia, las discrepancias entre fuentes y las preguntas pendientes, dejando el dictamen ético en manos del periodista humano."*
-3. **¿Cómo garantizan que la fórmula de atención $P$ no tenga sesgos?**  
-   *Respuesta*: *"A diferencia de un modelo de caja negra, cada componente ($R, I, U, N, E$) es visible de forma transparente en el dashboard con sus ponderaciones auditadas y desempate determinista por urgencia."*
+### 9:00–10:00 — Riesgos y próximos pasos
+
+«Los textos de fuentes se tratan como datos no confiables. El sistema conserva nulos y períodos, evita publicación automática y mantiene revisión humana. Las comprobaciones de citas no sustituyen comprobar el sustento semántico. La agenda presenta evidencia y preguntas; no clasifica noticias como verdaderas o falsas.»
+
+Mostrar condiciones por fuente, límites del control de inyección, evaluación humana y tareas pendientes. La banca es una extensión de análisis de entorno: no se infieren pérdidas, impagos o exposición de una cartera inexistente. Cerrar con el siguiente paso concreto de validación con una persona editorial.
+
+## 3. Ensayo y contingencia offline
+
+Antes del cierre, verificar el acceso de jurado a Notion y GitHub y registrar fecha, persona y resultado. Ensayar el flujo con el snapshot declarado y proveedores mock, sin ingesta en red. Guardar la evidencia en «Pruebas y métricas» y preparar las fichas utilizadas.
+
+El fallback local permite demostrar consultas y controles disponibles con ese corpus. Debe identificarse cuando se usa; no presentar una salida mock como ejecución del modelo remoto. Si una función o fuente no está disponible, mostrar la limitación y el comportamiento observado.
+
+El estado y el número de pruebas se consultan en el **último `make check` ejecutado**; no usar un conteo fijo en el discurso. Una suite verde no prueba por sí sola relevancia editorial, soporte semántico o resistencia a todos los ataques.
+
+## 4. Respuestas a pruebas dinámicas del jurado
+
+* **«¿De dónde viene esta cifra y de qué año es?»** Abrir el ID, campo/pasaje, URL oficial, país, año y unidad; distinguir período del dato y fecha de extracción.
+* **«Si cinco medios replican una agencia, ¿cuántas fuentes independientes cuentas?»** Una procedencia; mostrar los registros sin atribuir independencia que no esté verificada.
+* **«¿Qué pasa si falta evidencia o la fuente cambia las instrucciones?»** Demostrar el caso concreto de abstención o aislamiento, indicando alcance y limitaciones de las pruebas.
+* **«Muéstrame una decisión, una prueba fallida y su corrección en Notion.»** Navegar a los registros efectivos con responsable, fecha, ejecución y corrección; los Markdown locales sirven como insumo hasta publicarlos.
+* **«¿La fórmula elimina sesgos?»** No. Sus componentes visibles permiten inspeccionar y discutir criterios; la transparencia no acredita ausencia de sesgos.

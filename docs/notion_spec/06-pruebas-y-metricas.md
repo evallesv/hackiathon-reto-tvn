@@ -17,7 +17,7 @@ Todas las pruebas se ejecutan de manera automatizada mediante `pytest` con ejecu
 | **T04** | Los indicadores históricos del Banco Mundial conservan año exacto, país y unidad. | El registro de PIB de Panamá de 2023 conserva valor 7.3 y unidad `%`. | El loader conserva país, año, valor y unidad; las consultas y citas se prueban además en `test_query_and_banking.py`. | `test_acceptance_t01_t10.py::test_t04_*`, `test_query_and_banking.py` | **PASÓ** |
 | **T05** | Versiones contradictorias entre fuentes se exponen lado a lado con verificación pendiente. | Comparar dos textos sintéticos que afirman 15 y 28 millones de inversión. | En mock: `discrepancia_detectada: True`, dos versiones y estado `requiere_evidencia`; no escoger una cifra arbitrariamente. | `test_acceptance_t01_t10.py::test_t05_*` | **PASÓ** |
 | **T06** | Una consulta sin evidencia en el corpus emite abstención explícita sin alucinar. | Formatear la ausencia de registros de producción de litio de Panamá en 2025. | El formateador emite `[ABSTENCIÓN EXPLÍCITA]`; pruebas de consultas y benchmark comprueban también la ruta de servicio. No demuestra ausencia general de alucinaciones. | `test_acceptance_t01_t10.py::test_t06_*`, `test_query_and_banking.py` | **PASÓ** |
-| **T07** | Intentos de inyección de prompt dentro de fuentes son neutralizados y tratados como datos. | Patrones `"IGNORA INSTRUCCIONES"` neutralizados dentro de `<source_data>`. | El payload probado se neutraliza; la prueba no acredita resistencia frente a todos los ataques. | `test_acceptance_t01_t10.py::test_t07_*` | **PASÓ** |
+| **T07** | Intentos de inyección de prompt dentro de fuentes son neutralizados y tratados como datos. | Patrones `"IGNORA INSTRUCCIONES"` neutralizados dentro de `<source_data>`. | El payload probado se neutraliza; la prueba no acredita resistencia frente a todos los ataques. Las pruebas de safety comprueban además escape y aislamiento XML. | `test_acceptance_t01_t10.py::test_t07_*`, `test_safety.py` | **PASÓ** |
 | **T08** | Alto puntaje de atención con evidencia insuficiente bloquea publicación de borrador. | Caso sintético con $P = 92.0$ y evidencia insuficiente. | `can_publish_draft() == False` y motivo de investigación. Los guardas de generación se prueban además en `test_domain_invariants.py`. | `test_acceptance_t01_t10.py::test_t08_*`, `test_domain_invariants.py` | **PASÓ** |
 | **T09** | El brief editorial generado distingue hechos de declaraciones, inferencias e hipótesis. | Las afirmaciones estructuradas incluyen citas cuyo ID y fragmento existen; los términos de contenido deben aparecer en los pasajes citados. | Control léxico conservador sobre `afirmaciones`; no demuestra implicación semántica ni extrae automáticamente todas las afirmaciones del texto libre. | `test_acceptance_t01_t10.py::test_t09_*`, `test_safety.py` | **PARCIAL** |
 | **T10** | Prototipado y demo funcionan sin conexión a internet ni tokens de pago externos. | Generar agenda con mock y trabajar sobre una copia temporal del corpus. | Tres casos con puntaje positivo; el manifiesto original no cambia. La suite fuerza mocks e ingesta deshabilitada; no acredita un ensayo de demo con jurado. | `test_acceptance_t01_t10.py::test_t10_*`, `test_api.py`, `test_sqlite_snapshot.py` | **PASÓ** |
@@ -55,6 +55,16 @@ Latencia: consultar mediana y p95 en data/benchmark_results.json para la ejecuci
 ---
 
 ## 3. Resumen Comparativo de Baselines
+
+### Ejecución real de decisión (2026-10-09)
+
+El [reporte Jev](../validation/decision_jev_2026-10-09.json) guarda las diez entradas, etiquetas de
+desarrollo, predicciones, probabilidades y latencias. Jev `jev-1.13-free` obtuvo Macro-F1 **1.000**
+frente a **0.792** del baseline regex, con **10/10** predicciones coincidentes y **0/10** fallbacks.
+Mediana **609.280 ms** y p95 **863.804 ms** en este entorno. Son diez pares sintéticos expuestos,
+con etiquetas creadas para desarrollo; no demuestran generalización ni validación editorial independiente.
+La respuesta no proporcionó tokens reconocibles en `usage`; tokens y costo permanecen sin dato verificado.
+El nombre `free` del modelo no constituye una medición de costo.
 
 | Componente del Sistema | Baseline Clásico | Solución Copiloto IA (Sentria) | Impacto / Ganancia |
 | :--- | :--- | :--- | :--- |

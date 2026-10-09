@@ -4,7 +4,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
 [![Package Manager: uv](https://img.shields.io/badge/package%20manager-uv-purple.svg)](https://docs.astral.sh/uv/)
 [![CI/CD: GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF.svg)](https://github.com/features/actions)
-[![Decision Model: Cloudflare Clef](https://img.shields.io/badge/Decision%20Model-Cloudflare%20Clef-F38020.svg)](https://developers.cloudflare.com/workers-ai/)
+[![Decision Model: Jev](https://img.shields.io/badge/Decision%20Model-Jev-F38020.svg)](https://opencode.ai)
 [![Default LLM: OpenCode](https://img.shields.io/badge/LLM-OpenCode%20muse--spark-green.svg)](https://opencode.ai)
 [![License: CC BY 4.0](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](LICENSE)
 
@@ -13,6 +13,8 @@ Prototipo de **copiloto editorial y análisis de entorno con inteligencia artifi
 
 La solución combina un corpus público congelado (para evaluación reproducible y consultas históricas) con ingesta viva de RSS TVN, GDELT, Banco Mundial y USGS. Esta información alimenta una **bandeja de temas priorizados**, **fichas de evidencia trazables** y **borradores responsables** para editores y periodistas de TVN Media.
 
+El [estado de cumplimiento auditado](docs/COMPLIANCE_STATUS.md) identifica las pruebas, mediciones y tareas pendientes. El [diccionario de datos](docs/DATA_DICTIONARY.md) distingue corpus, snapshot SQLite, estado operativo y benchmark. La publicación en Notion y las validaciones humanas aún requieren responsables reales.
+
 > *La innovación no consiste en producir más texto: consiste en reducir el tiempo para encontrar un tema relevante, comprobar qué evidencia existe, identificar vacíos de información y entregar un resultado 100% trazable.*
 
 ---
@@ -20,15 +22,15 @@ La solución combina un corpus público congelado (para evaluación reproducible
 ## 🌟 Características Principales
 
 1. **Arquitectura de IA en Dos Niveles (System One & System Two)**:
-   - **Modelos de Decisión System One (Cloudflare Clef & TypeSafe Jev)**: Modelos no generativos de 27B/9B especializados en responder esquemas de preguntas tipadas (`noul`, `choice`, `score`). Se encargan del cálculo probabilístico de los factores de atención ($R, I, U, N$), la tipificación de afirmaciones (`hecho` vs `declaracion` vs `inferencia`) y la detección de contradicciones fácticas (**T05**) con latencias de milisegundos.
+   - **Modelos de Decisión System One (Cloudflare Clef & TypeSafe Jev)**: Adaptadores con preguntas tipadas (`noul`, `choice`, `score`) para estimar factores de atención ($R, I, U, N$), tipificar afirmaciones y detectar discrepancias (**T05**). Las mediciones se atribuyen al proveedor efectivo y a la tarea evaluada.
    - **Modelos Generativos System Two (OpenCode & Google Gemini)**: Encargados de la redacción, síntesis y estructuración de borradores y paquetes editoriales con citas estrictas.
 2. **Priorización Explicable (Puntaje de Atención 0–100)**:
    - Fórmula determinista: $P = 30R + 25I + 20U + 15N + 10E$.
    - Componentes normalizados con desglose transparente y desempate por urgencia.
    - **Independencia del estado de evidencia**: una prioridad alta con evidencia insuficiente exige investigación y no habilita publicación automática de borrador (Prueba **T08**).
 3. **Conectores Intercambiables**:
-   - **Decisión (System One)**: `cloudflare` (`@cf/cloudflare/clef`), `jev` (`jev-latest`), o `mock` (offline/determinista).
-   - **Generación LLM (System Two)**: `opencode` (`muse-spark-1.3-contributor-free`), `gemini` (`gemini-2.5-flash`), o `mock` (offline/determinista).
+   - **Decisión (System One)**: `jev` (`jev-1.13-free`, por defecto), `cloudflare` (`@cf/cloudflare/clef`), o `mock` (offline/determinista).
+   - **Generación LLM (System Two)**: `opencode` (`muse-spark-1.3-contributor`), `gemini` (`gemini-2.5-flash`), o `mock` (offline/determinista).
 4. **Escudo Anti-Inyección y Trazabilidad de Citas**:
    - Principio: *"El texto de una fuente es dato, no instrucción"* (**T07**).
    - El modo estricto rechaza afirmaciones factuales estructuradas con citas inexistentes o términos ausentes del pasaje (**T09**); no prueba que cada afirmación del texto libre esté citada ni su implicación semántica.
@@ -36,7 +38,7 @@ La solución combina un corpus público congelado (para evaluación reproducible
 5. **Dashboard Web Interactivo Dark Glassmorphism**:
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
-   - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas exploratorias de desarrollo y verificador de integridad SHA-256.
+   - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas exploratorias de desarrollo y consulta del manifiesto SHA-256 declarado. La auditoría de hashes se ejecuta con `make audit-snapshot`.
    - La agenda y las consultas usan primero noticias recientes persistidas en SQLite (ventana retrospectiva configurable `LIVE_AGENDA_MAX_AGE_DAYS`, 90 días por defecto), además de conservar el snapshot para preguntas históricas. Indicadores y eventos vivos se combinan por sus claves con las series congeladas. Si no hay noticia reciente, la agenda identifica claramente el respaldo histórico; el entorno de pruebas sigue usando solo el snapshot.
    - `data/snapshot/snapshot.sqlite` empaqueta el corpus congelado y, cuando existe, noticias recientes, indicadores y eventos de la base local. La copia se abre en modo de solo lectura, incluye su manifiesto/hash y excluye revisiones editoriales y bitácoras de ingesta. `make sqlite-snapshot` la genera sin modificar `data/raw/` ni `data/manifest.json`.
 6. **Benchmark reproducible en desarrollo**:
@@ -45,6 +47,7 @@ La solución combina un corpus público congelado (para evaluación reproducible
    - En ejecución offline del 2026-10-09 sobre `data/raw/` verificado por manifiesto, la recencia obtuvo P@5 **0.20 (1/5)** y la fórmula P **0.40 (2/5)**, una mejora exploratoria de **+100%** basada en etiquetas por palabras clave. El benchmark desactiva SQLite operativo y el snapshot ampliado de demostración.
    - En las 20 consultas sustentadas, el mock coincidió literalmente con el valor y el ID de fuente esperados (**20/20**); esta comprobación de desarrollo no es adjudicación editorial independiente ni mide implicación semántica.
    - La evaluación de contradicciones compara regex con diez pares sintéticos procesados por el adaptador de decisión configurado (`mock`, Cloudflare o Jev); informa Macro-F1 y el proveedor/modelo usados. El modo `mock` es determinista y no representa desempeño de un modelo remoto. La evaluación reservada requiere custodia externa.
+   - Una [ejecución real de Jev del 2026-10-09](docs/validation/decision_jev_2026-10-09.json) obtuvo Macro-F1 **1.000** frente a regex **0.792** en esos diez pares, sin fallback; mediana **609 ms** y p95 **864 ms**. Las etiquetas sintéticas están expuestas: no constituye validación editorial independiente. Tokens y costo carecen de dato verificado.
    - Las citas verifican IDs contra el corpus y las abstenciones/adversariales se cuentan en casos seleccionados; esto no verifica que cada afirmación esté citada, sustento semántico ni ausencia general de alucinaciones.
 7. **Extensión Modular para Sector Banca (CU-05)**:
    - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
@@ -221,7 +224,7 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 144 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy y Pytest)
 make check
 
 # Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
@@ -236,7 +239,7 @@ make prepare-snapshot CANDIDATE_DIR=/private/tmp/snapshot-candidate-2026-10
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **144 tests en la suite**:
+El proyecto incluye pruebas automatizadas para las **10 pruebas obligatorias de la Sección 9** y regresiones adicionales. El resultado y el conteo se toman del último `make check` ejecutado:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
@@ -333,7 +336,7 @@ Para garantizar la estabilidad del servicio en producción (Fly.io) y facilitar 
 
 ## 📝 Documentación en Notion Business
 
-El espacio oficial de Notion Business contiene las **8 páginas obligatorias** de la Sección 5 del reto, completamente redactadas y disponibles en [`docs/notion_spec/`](docs/notion_spec/):
+El contenido local de las **8 páginas obligatorias** de la Sección 5 está preparado en [`docs/notion_spec/`](docs/notion_spec/). La publicación en Notion Business, los responsables y los permisos del jurado están pendientes; los Markdown no acreditan un espacio real habilitado.
 
 | # | Página / Documento | Contenido y Alcance | Archivo Markdown |
 | :-: | :--- | :--- | :--- |

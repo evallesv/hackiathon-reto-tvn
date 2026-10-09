@@ -246,7 +246,7 @@ El sistema incluye una interfaz web nativa servida directamente por el backend F
   1. *Agenda Priorizada (CU-01)*: Ranking visual, barras de desglose de $R, I, U, N, E$, filtros por banda y alerta activa de Guardrail T08.
   2. *Fichas & Borradores (CU-02 a CU-05)*: Navegación de casos, inspección de afirmaciones y citas, previsualización de Brief (250 palabras), Guion TV (45-60s), Copy Digital (80 palabras) y controles de revisión humana.
   3. *Consola Interactiva del Jurado*: Botones para pruebas inmediatas de criterios T04 (BM), T05 (Contradicciones), T06 (Abstención), T07 (Anti-Inyección), USGS, y consola de consulta libre.
-  4. *Métricas & Integridad*: KPIs dinámicos, tabla comparativa de baselines y verificador de hashes criptográficos SHA-256.
+  4. *Métricas & Integridad*: KPIs dinámicos, tabla comparativa de baselines y consulta del manifiesto SHA-256 declarado. `make audit-snapshot` verifica los hashes; el panel por sí solo no los recalcula.
 
 ---
 
