@@ -16,6 +16,7 @@ from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 from hackiathon_reto_tvn.adapters.decision.factory import get_decision_client
 from hackiathon_reto_tvn.adapters.llm.factory import get_llm_client
 from hackiathon_reto_tvn.config import Settings, get_settings
+from hackiathon_reto_tvn.domain.editorial_constraints import validate_banking_draft, validate_editorial_draft
 from hackiathon_reto_tvn.domain.models import (
     Afirmacion,
     BorradorBancario,
@@ -421,6 +422,17 @@ class CopilotService:
             ),
         )
 
+        length_violations = validate_editorial_draft(
+            borrador,
+            brief_word_limit=self.settings.MAX_SUMMARY_WORDS_TVN_BRIEF,
+            copy_word_limit=self.settings.MAX_WORDS_TVN_DIGITAL_COPY,
+            script_min_seconds=self.settings.SCRIPT_DURATION_SECONDS_MIN,
+            script_max_seconds=self.settings.SCRIPT_DURATION_SECONDS_MAX,
+            script_words_per_minute=self.settings.SCRIPT_WORDS_PER_MINUTE,
+        )
+        if length_violations:
+            raise ValueError(f"Borrador rechazado por límite editorial: {'; '.join(length_violations)}")
+
         # Validate source identity, the quoted passage, and claim wording against case evidence.
         valid_sources = set(caso.ids_fuente)
         source_passages = self._case_source_passages(caso)
@@ -510,6 +522,10 @@ class CopilotService:
                 "Cita cada afirmación fáctica rigurosamente y separa hechos de hipótesis."
             ),
         )
+
+        length_violations = validate_banking_draft(borrador, self.settings.MAX_SUMMARY_WORDS_TVN_BRIEF)
+        if length_violations:
+            raise ValueError(f"Boletín rechazado por límite editorial: {'; '.join(length_violations)}")
 
         valid_sources = set(caso.ids_fuente)
         source_passages = self._case_source_passages(caso)

@@ -15,6 +15,7 @@ from hackiathon_reto_tvn.config import Settings
 from hackiathon_reto_tvn.domain import models as domain_models
 from hackiathon_reto_tvn.domain.models import (
     Afirmacion,
+    BorradorBancario,
     BorradorEditorial,
     CitaEvidencia,
     ComponentesPuntaje,
@@ -178,6 +179,47 @@ async def test_draft_citation_with_valid_id_but_unsupported_details_is_rejected(
 
     with pytest.raises(ValueError, match="cobertura de citas"):
         await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "content"),
+    [
+        ("brief_250", "palabra " * 251),
+        ("copy_digital_80", "palabra " * 81),
+        ("guion_45_60s", "guion demasiado corto"),
+    ],
+)
+async def test_editorial_package_rejects_outputs_outside_configured_limits(field: str, content: str) -> None:
+    draft = await _mock_draft()
+    setattr(draft, field, content)
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="límite editorial"):
+        await service.generate_tvn_editorial_package(caso)
+
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
+
+
+@pytest.mark.asyncio
+async def test_banking_bulletin_rejects_summary_over_250_words() -> None:
+    draft = BorradorBancario(
+        resumen_250="palabra " * 251,
+        horizonte_temporal="Corto plazo",
+        preguntas_analista=["¿Qué falta verificar?", "¿Qué fuente lo confirma?", "¿Cuál es el periodo?"],
+        observacion="Observación pendiente de verificar.",
+        hipotesis_impacto="Hipótesis por evaluar.",
+    )
+    service = CopilotService(settings=Settings(), llm_client=_CapturingLLM(draft))  # type: ignore[arg-type]
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="resumen bancario.*máximo 250"):
+        await service.generate_banking_bulletin(caso)
+
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
 
 
 @pytest.mark.asyncio

@@ -358,8 +358,8 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | :--- | :--- | :--- |
 | **T05 (conflicts)** | Contradiction detector implemented via BaseDecisionClient in CopilotService.detect_contradictions. | `services/copilot_service.py`, `tests/test_acceptance_t01_t10.py` |
 | **Scoring inputs** | Evaluated via System One decision models (Clef/Jev) with fallback to regex heuristics. | `services/copilot_service.py::prioritize_agenda_async` |
-| **Draft limits** | 250/80 words and 45–60 s script are config values only; nothing validates a generated draft against them. | `config.py`, `BorradorEditorial` |
-| **Draft trust boundary** | `POST /generate-draft` accepts a client-supplied `FichaCaso` (including `estado_evidencia`), so a client can self-declare sufficient evidence. Resolve the case server-side by `id_caso`. | `api/routes.py` |
+| **Draft limits** | RESOLVED: editorial packages enforce a 250-word brief, 80-word copy, and 113–150 spoken-word script using configurable 150 words/minute for 45–60 seconds; banking summaries enforce the 250-word limit. | `domain/editorial_constraints.py`, `services/copilot_service.py`, `tests/test_domain_invariants.py` |
+| **Draft trust boundary** | RESOLVED: `POST /generate-draft` and `POST /generate-banking-draft` accept only `caso_id`; the server derives evidence and score from the current corpus. | `api/routes.py`, `tests/test_api.py` |
 | **Review persistence** | RESOLVED: `POST /review` persists human reviews in SQLite (`fichas_casos`) and updates `FichaCaso` records with reviewer and notes. | `adapters/data/sqlite_storage.py`, `api/routes.py` |
 | **API boundary** | `/manifest` does file I/O in the route; Boundary Rule 4 says routes only delegate. | `api/routes.py` |
 | **Event grouping** | Clusters by the first 3 title tokens longer than 3 chars: fragile for paraphrased headlines. | `EventGrouper.group_articles` |

@@ -87,8 +87,19 @@ class MockLLMAdapter(BaseLLMClient):
                     "Auditoría de la Contraloría General de la República",
                     "Declaración oficial de la entidad rectora de servicios públicos",
                 ],
-                "guion_45_60s": f"{supported_statement}. El material disponible contiene únicamente el titular y sus metadatos. "
-                "Nuestro equipo busca confirmar el contexto, el alcance y la información pendiente con fuentes directas.",
+                "guion_45_60s": (
+                    f"{supported_statement}. El material disponible contiene únicamente el titular y sus metadatos. "
+                    "Con esta información no es posible confirmar todavía todos los detalles de la noticia. "
+                    "La redacción debe consultar documentos públicos, hablar con las autoridades responsables y "
+                    "buscar a las personas directamente afectadas. También corresponde revisar cuándo ocurrió el "
+                    "hecho, qué antecedentes ayudan a entenderlo y qué preguntas siguen abiertas. Antes de publicar, "
+                    "el equipo verificará cada dato con una fuente identificable y explicará con claridad cualquier "
+                    "información que todavía no esté disponible. El titular sirve como punto de partida para la "
+                    "investigación, pero no reemplaza el contexto ni la confirmación independiente. En esta etapa, "
+                    "las cifras, las causas y las consecuencias deben permanecer pendientes hasta que exista respaldo "
+                    "documental suficiente. La audiencia merece conocer qué se sabe, qué falta por comprobar y cómo "
+                    "se buscará esa información."
+                ),
                 "copy_digital_80": f"{supported_statement}. Información basada únicamente en titular y metadatos; contexto pendiente de verificación.",
                 "afirmaciones": [
                     {
