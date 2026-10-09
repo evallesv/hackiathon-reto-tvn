@@ -115,7 +115,8 @@ class _CapturingLLM(BaseLLMClient):
 
 
 async def _mock_draft() -> BorradorEditorial:
-    return await MockLLMAdapter().generate_structured("", BorradorEditorial)
+    prompt = SafetyGuard.format_as_data_payload("NOT-001", "MOP anuncia plan de vías", "MOP anuncia plan de vías")
+    return await MockLLMAdapter().generate_structured(prompt, BorradorEditorial)
 
 
 # --- T03: recirculation compares dates, not raw timestamps -------------------------------------------------

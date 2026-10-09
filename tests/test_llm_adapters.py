@@ -8,6 +8,7 @@ from hackiathon_reto_tvn.adapters.llm.mock_adapter import MockLLMAdapter
 from hackiathon_reto_tvn.adapters.llm.opencode_adapter import OpenCodeAdapter
 from hackiathon_reto_tvn.config import Settings
 from hackiathon_reto_tvn.domain.models import BorradorEditorial
+from hackiathon_reto_tvn.domain.safety import SafetyGuard
 
 
 @pytest.mark.asyncio
@@ -24,7 +25,10 @@ async def test_mock_adapter_generate_text() -> None:
 async def test_mock_adapter_generate_structured_borrador() -> None:
     adapter = MockLLMAdapter()
     borrador = await adapter.generate_structured(
-        prompt="Generar brief para caso 1",
+        prompt=(
+            "Generar brief para caso 1\n"
+            + SafetyGuard.format_as_data_payload("NOT-TEST-1", "Titular de prueba verificable", "")
+        ),
         response_model=BorradorEditorial,
     )
     assert isinstance(borrador, BorradorEditorial)

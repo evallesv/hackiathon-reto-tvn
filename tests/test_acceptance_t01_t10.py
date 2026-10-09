@@ -188,7 +188,8 @@ async def test_t09_brief_editorial_distincion_hechos_inferencias() -> None:
     assert len(borrador.preguntas_investigacion) >= 3
     # Comprobar que distingue tipos de afirmación
     tipos = {af.tipo for af in borrador.afirmaciones}
-    assert TipoAfirmacion.HECHO in tipos
+    assert TipoAfirmacion.DECLARACION in tipos
+    assert borrador.afirmaciones[0].citas[0].texto_sustento in borrador.afirmaciones[0].texto
 
 
 @pytest.mark.asyncio

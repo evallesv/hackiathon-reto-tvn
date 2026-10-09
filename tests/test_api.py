@@ -53,6 +53,32 @@ def test_agenda_endpoint() -> None:
         assert "componentes" in data[0]
 
 
+def test_generate_draft_resolves_case_from_server_corpus() -> None:
+    """The client can select a case ID but cannot provide its evidence state or sources."""
+    agenda = client.get("/api/v1/copilot/agenda?top_n=20").json()
+    eligible = next(item for item in agenda if item["estado_evidencia"] != "insuficiente")
+    response = client.post(
+        "/api/v1/copilot/generate-draft",
+        json={
+            "caso_id": eligible["id_caso"],
+            "estado_evidencia": "suficiente_para_borrador",
+            "ids_fuente": ["FUENTE-INVENTADA"],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["basado_unicamente_en_titular_metadatos"] is True
+    assert client.post("/api/v1/copilot/generate-draft", json={"caso_id": "CASO-INVENTADO"}).status_code == 404
+
+
+def test_benchmark_endpoint_returns_development_run_not_saved_full_benchmark() -> None:
+    """The endpoint executes the dev split instead of returning the stale full-run cache."""
+    response = client.get("/api/v1/copilot/benchmark/metrics")
+    assert response.status_code == 200
+    summary = response.json()["resumen_benchmark"]
+    assert summary["total_consultas_ejecutadas"] == 40
+    assert summary["modo_evaluacion"] == "desarrollo (40)"
+
+
 def test_manifest_endpoint() -> None:
     response = client.get("/api/v1/copilot/manifest")
     assert response.status_code == 200

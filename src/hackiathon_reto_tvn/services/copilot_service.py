@@ -194,9 +194,25 @@ class CopilotService:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             return executor.submit(asyncio.run, self.prioritize_agenda_async(top_n=top_n)).result()
 
+    async def get_agenda_case(self, id_caso: str) -> Optional[FichaCaso]:
+        """Resolve a draft target from server-side corpus data, never from a client-supplied ficha."""
+        casos = await self.prioritize_agenda_async(top_n=20)
+        return next((caso for caso in casos if caso.id_caso == id_caso), None)
+
     async def detect_contradictions(self, texto_a: str, texto_b: str) -> Dict[str, Any]:
         """Evaluates whether two statements or sources contain factual contradictions using the decision model (T05)."""
-        state_text = f"Versión A: {texto_a}\nVersión B: {texto_b}"
+        texto_a_seguro, inyeccion_a = SafetyGuard.sanitize_untrusted_text(texto_a)
+        texto_b_seguro, inyeccion_b = SafetyGuard.sanitize_untrusted_text(texto_b)
+        if inyeccion_a or inyeccion_b:
+            return {
+                "discrepancia_detectada": False,
+                "versiones": [texto_a_seguro, texto_b_seguro],
+                "probabilidad_discrepancia": 0.0,
+                "estado": "requiere_evidencia",
+                "accion": "Contenido no confiable neutralizado; verificar ambas versiones con fuentes independientes.",
+            }
+
+        state_text = f"Versión A: {texto_a_seguro}\nVersión B: {texto_b_seguro}"
         questions: Dict[str, QuestionDefinition] = {
             "discrepancia": NoulQuestion(
                 instructions="¿Existe discrepancia, incompatibilidad o contradicción fáctica entre las afirmaciones de la Versión A y la Versión B?"
@@ -207,7 +223,7 @@ class CopilotService:
         discrepancia = prob >= 0.5
         return {
             "discrepancia_detectada": discrepancia,
-            "versiones": [texto_a, texto_b],
+            "versiones": [texto_a_seguro, texto_b_seguro],
             "probabilidad_discrepancia": prob,
             "estado": "requiere_evidencia" if discrepancia else "consistente",
             "accion": (
@@ -412,27 +428,30 @@ class CopilotService:
                 or "vía" in n.titulo.lower()
                 or "via" in n.titulo.lower()
             ]
-            if len(n_inv) >= 2:
-                v1 = n_inv[0].titulo
-                v2 = n_inv[1].titulo
-                citas = [
-                    {"id_fuente": n_inv[0].id_noticia, "pasaje": v1, "url": n_inv[0].url},
-                    {"id_fuente": n_inv[1].id_noticia, "pasaje": v2, "url": n_inv[1].url},
-                ]
-            else:
-                v1 = "Fuente A afirma 15 millones de inversión en infraestructura"
-                v2 = "Fuente B afirma 28 millones de inversión en infraestructura"
-                citas = [
-                    {"id_fuente": "NOT-001", "pasaje": v1, "url": "https://tvn-2.com/1"},
-                    {"id_fuente": "NOT-007", "pasaje": v2, "url": "https://tvn-2.com/7"},
-                ]
+            if len(n_inv) < 2:
+                abstencion = SafetyGuard.format_explicit_abstention(
+                    topic_or_query=consulta,
+                    missing_reason="El corpus no contiene dos versiones verificables para comparar",
+                )
+                return QueryResponse(consulta=consulta, respuesta=abstencion, es_abstencion=True, citas=[])
+
+            v1, v2 = n_inv[0].titulo, n_inv[1].titulo
+            citas = [
+                {"id_fuente": n_inv[0].id_noticia, "pasaje": v1, "url": n_inv[0].url},
+                {"id_fuente": n_inv[1].id_noticia, "pasaje": v2, "url": n_inv[1].url},
+            ]
             dossier = await self.detect_contradictions(v1, v2)
-            respuesta = (
-                f"[CONTRADICCIÓN DETECTADA]: Se identificaron versiones divergentes sobre el monto reportado:\n"
-                f"- Versión 1: '{v1}'\n"
-                f"- Versión 2: '{v2}'\n"
-                f"Estado: {dossier['estado']}. Acción: {dossier['accion']}"
-            )
+            if dossier["discrepancia_detectada"]:
+                respuesta = (
+                    f"[CONTRADICCIÓN DETECTADA]:\n- Versión 1: '{v1}'\n- Versión 2: '{v2}'\n"
+                    f"Estado: {dossier['estado']}. Acción: {dossier['accion']}"
+                )
+            else:
+                abstencion = SafetyGuard.format_explicit_abstention(
+                    topic_or_query=consulta,
+                    missing_reason="Las fuentes encontradas no permiten confirmar una contradicción entre versiones comparables",
+                )
+                return QueryResponse(consulta=consulta, respuesta=abstencion, es_abstencion=True, citas=[])
             return QueryResponse(
                 consulta=consulta,
                 respuesta=respuesta,
@@ -590,7 +609,13 @@ class CopilotService:
         # 6. Canal draft / calado
         noticias, _ = self.load_corpus()
         if "calado" in q_lower or "canal" in q_lower:
-            n_canal = next((n for n in noticias if "calado" in n.titulo.lower()), None)
+            year_match = re.search(r"\b(20\d{2})\b", q_lower)
+            canal_news = [n for n in noticias if "calado" in n.titulo.lower()]
+            n_canal = (
+                next((n for n in canal_news if n.fecha_publicacion.startswith(year_match.group(1))), None)
+                if year_match
+                else next(iter(canal_news), None)
+            )
             if n_canal:
                 return QueryResponse(
                     consulta=consulta,
@@ -608,6 +633,12 @@ class CopilotService:
                         }
                     ],
                 )
+            if year_match:
+                abstencion = SafetyGuard.format_explicit_abstention(
+                    topic_or_query=consulta,
+                    missing_reason=f"No hay un reporte de calado con fecha {year_match.group(1)} en el corpus",
+                )
+                return QueryResponse(consulta=consulta, respuesta=abstencion, es_abstencion=True, citas=[])
 
         # 7. Recirculated news (T03)
         if "recirculad" in q_lower or (

@@ -43,6 +43,12 @@ class ContradictionRequest(BaseModel):
     texto_b: str = Field(..., description="Segunda versión o afirmación")
 
 
+class GenerateDraftRequest(BaseModel):
+    """Identifies a server-resolved case; client evidence and scores are never accepted."""
+
+    caso_id: str
+
+
 def get_copilot_service(settings: Settings = Depends(get_settings)) -> CopilotService:
     return CopilotService(settings=settings)
 
@@ -94,13 +100,18 @@ async def check_contradictions(
 
 @router.post("/api/v1/copilot/generate-draft", response_model=BorradorEditorial, tags=["Copilot"])
 async def generate_draft(
-    caso: FichaCaso,
+    req: GenerateDraftRequest,
     service: CopilotService = Depends(get_copilot_service),
 ) -> BorradorEditorial:
-    """Generates a complete TVN editorial package with citations for a given case."""
+    """Generates a package for a case resolved from the server's current corpus."""
     try:
+        caso = await service.get_agenda_case(req.caso_id)
+        if caso is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caso no encontrado en la agenda actual.")
         borrador = await service.generate_tvn_editorial_package(caso)
         return borrador
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -110,13 +121,18 @@ async def generate_draft(
 
 @router.post("/api/v1/copilot/generate-banking-draft", response_model=BorradorBancario, tags=["Copilot"])
 async def generate_banking_draft(
-    caso: FichaCaso,
+    req: GenerateDraftRequest,
     service: CopilotService = Depends(get_copilot_service),
 ) -> BorradorBancario:
     """Generates an economic and logistics environment bulletin for banking analysts (CU-05)."""
     try:
+        caso = await service.get_agenda_case(req.caso_id)
+        if caso is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caso no encontrado en la agenda actual.")
         borrador = await service.generate_banking_bulletin(caso)
         return borrador
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -294,19 +310,7 @@ async def get_benchmark_metrics(
     service: CopilotService = Depends(get_copilot_service),
 ) -> Dict[str, Any]:
     """Returns official evaluation benchmark metrics and comparative baseline results (Sección 8 & 9.1)."""
-    import json
-    from pathlib import Path
-
     from hackiathon_reto_tvn.services.baseline_evaluator import BaselineEvaluator
-
-    cache_file = Path("data/benchmark_results.json")
-    if cache_file.exists():
-        try:
-            with open(cache_file, "r", encoding="utf-8") as f:
-                data: Dict[str, Any] = json.load(f)
-                return data
-        except Exception:
-            pass
 
     evaluator = BaselineEvaluator(service=service, settings=service.settings)
     return await evaluator.run_benchmark_suite(only_dev=True)
