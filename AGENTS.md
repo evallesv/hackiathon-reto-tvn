@@ -338,7 +338,7 @@ Before marking any task as done, submitting a PR, or creating a commit, execute 
 - [ ] `uv run ruff check .` returns zero errors.
 - [ ] `uv run ruff format --check .` returns zero reformatting requirements.
 - [ ] `uv run mypy src/` returns `Success: no issues found`.
-- [ ] `uv run pytest` passes 100% of tests (all 60 tests and T01–T10).
+- [ ] `uv run pytest` passes 100% of tests (all 80 tests and T01–T10).
 - [ ] `git diff --stat -- data/` shows no changes (tests and features must not mutate the frozen dataset or `data/manifest.json`).
 - [ ] No hardcoded API keys or secrets exist in any file; `.env` was never modified or committed.
 - [ ] New behaviour has a test; a bug fix has a regression test that fails without the fix.
@@ -358,7 +358,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | **Scoring inputs** | Evaluated via System One decision models (Clef/Jev) with fallback to regex heuristics. | `services/copilot_service.py::prioritize_agenda_async` |
 | **Draft limits** | 250/80 words and 45–60 s script are config values only; nothing validates a generated draft against them. | `config.py`, `BorradorEditorial` |
 | **Draft trust boundary** | `POST /generate-draft` accepts a client-supplied `FichaCaso` (including `estado_evidencia`), so a client can self-declare sufficient evidence. Resolve the case server-side by `id_caso`. | `api/routes.py` |
-| **Review persistence** | `POST /review` recomputes the agenda and mutates a transient object; nothing is persisted. | `api/routes.py`, `CopilotService.update_human_review` |
+| **Review persistence** | RESOLVED: `POST /review` persists human reviews in SQLite (`fichas_casos`) and updates `FichaCaso` records with reviewer and notes. | `adapters/data/sqlite_storage.py`, `api/routes.py` |
 | **API boundary** | `/manifest` does file I/O in the route; Boundary Rule 4 says routes only delegate. | `api/routes.py` |
 | **Event grouping** | Clusters by the first 3 title tokens longer than 3 chars: fragile for paraphrased headlines. | `EventGrouper.group_articles` |
 | **Indicator defaults** | Missing `anio`/`pais_iso3` columns are defaulted (`2024`/`PAN`) instead of preserved as null, which conflicts with T01/T04 intent. | `LocalStorageRepository.load_indicadores` |
