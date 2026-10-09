@@ -245,11 +245,11 @@
             <div class="panel-header">
                 <div>
                     <h2>Métricas Formales de Evaluación & Benchmark (Sección 8 & 9.1)</h2>
-                    <p class="subtitle">Evaluación objetiva sobre 60 consultas etiquetadas (40 dev / 20 jurado) y comparación con baselines clásicos.</p>
+                    <p class="subtitle">Ejecución sobre las 40 consultas de desarrollo. El conjunto reservado queda separado para evaluación externa.</p>
                 </div>
                 <div class="panel-actions">
                     <button id="btn-run-benchmark" class="btn btn-primary">
-                        <span>▶ Ejecutar Benchmark en Vivo</span>
+                        <span>▶ Ejecutar benchmark de desarrollo</span>
                     </button>
                 </div>
             </div>
@@ -257,40 +257,40 @@
             <!-- Key Metrics KPI Cards -->
             <div class="kpi-grid" id="kpi-container">
                 <div class="kpi-card">
-                    <span class="kpi-label">Cobertura de Citas</span>
-                    <div class="kpi-value text-accent" id="metric-citation">100.0%</div>
-                    <span class="kpi-target">Meta: 100% (T09)</span>
+                    <span class="kpi-label">Respuestas sustentadas con ID citado</span>
+                    <div class="kpi-value text-accent" id="metric-citation">—</div>
+                    <span class="kpi-target">El evaluador no verifica soporte semántico (T09)</span>
                 </div>
                 <div class="kpi-card">
-                    <span class="kpi-label">Tasa de Abstención Explícita</span>
-                    <div class="kpi-value text-success" id="metric-abstention">100.0%</div>
-                    <span class="kpi-target">Meta: 100% sin alucinar (T06)</span>
+                    <span class="kpi-label">Abstención en consultas sin respuesta</span>
+                    <div class="kpi-value text-success" id="metric-abstention">—</div>
+                    <span class="kpi-target">Métrica de consultas seleccionadas; no prueba cero alucinaciones</span>
                 </div>
                 <div class="kpi-card">
-                    <span class="kpi-label">Defensa Anti-Inyección</span>
-                    <div class="kpi-value text-success" id="metric-injection">100.0%</div>
-                    <span class="kpi-target">Meta: 100% neutralizado (T07)</span>
+                    <span class="kpi-label">Marcador adversarial detectado</span>
+                    <div class="kpi-value text-success" id="metric-injection">—</div>
+                    <span class="kpi-target">No es una medición general de seguridad</span>
                 </div>
                 <div class="kpi-card">
-                    <span class="kpi-label">Mejora Relativa Priorización</span>
-                    <div class="kpi-value text-gold" id="metric-p5-gain">+100.0%</div>
-                    <span class="kpi-target">Precision@5: P(0.80) vs Recency(0.40)</span>
+                    <span class="kpi-label">Cambio relativo de P@5</span>
+                    <div class="kpi-value text-gold" id="metric-p5-gain">—</div>
+                    <span class="kpi-target">Cinco casos; etiquetas por palabras clave, evaluación exploratoria</span>
                 </div>
                 <div class="kpi-card">
-                    <span class="kpi-label">Macro-F1 Decisión (S1)</span>
-                    <div class="kpi-value text-gold" id="metric-f1">0.941</div>
-                    <span class="kpi-target">Mejora: +45.4% vs Regex Heuristics</span>
+                    <span class="kpi-label">F1 de contradicción (regla mock)</span>
+                    <div class="kpi-value text-gold" id="metric-f1">—</div>
+                    <span class="kpi-target">Muestra sintética; no es macro-F1 ni mide el modelo real</span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-label">Latencia Mediana P50</span>
                     <div class="kpi-value text-info" id="metric-latency">0.7 ms</div>
-                    <span class="kpi-target">Tiempo real &bull; SLA &lt; 2.0 s</span>
+                    <span class="kpi-target">Latencia del modo y proveedor indicados en el resultado</span>
                 </div>
             </div>
 
             <!-- Comparative Baselines Table -->
             <div class="comparison-section">
-                <h3>Comparativa Rigurosa de Baselines</h3>
+                <h3>Resultados exploratorios del baseline</h3>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -305,24 +305,24 @@
                         <tbody>
                             <tr>
                                 <td><strong>Priorización de Agenda (CU-01)</strong></td>
-                                <td>Ordenamiento por Recencia Temporal (P@5: <code>0.40</code>)</td>
-                                <td>Fórmula Explicable P = 30R+25I+20U+15N+10E (P@5: <code>0.80</code>)</td>
-                                <td><span class="badge badge-success">+0.40</span></td>
-                                <td><strong>+100.0%</strong></td>
+                                <td>Ordenamiento por recencia (P@5: <code>0.20 (1/5)</code>)</td>
+                                <td>Fórmula explicable P = 30R+25I+20U+15N+10E (P@5: <code>0.40 (2/5)</code>)</td>
+                                <td><span class="badge badge-success">+0.20</span></td>
+                                <td><strong>+100.0%, exploratorio</strong></td>
                             </tr>
                             <tr>
-                                <td><strong>Clasificación System One (R, I, U, N, E)</strong></td>
-                                <td>Heurística Regex por Palabras Clave (Macro-F1: <code>0.647</code>)</td>
-                                <td>Modelos de Decisión Cloudflare Clef / Jev (Macro-F1: <code>0.941</code>)</td>
-                                <td><span class="badge badge-success">+0.294</span></td>
-                                <td><strong>+45.4%</strong></td>
+                                <td><strong>Detección de contradicciones, muestra sintética</strong></td>
+                                <td>Regex (F1 clase positiva: <code>0.833</code>)</td>
+                                <td>Regla mock, no modelo System One (F1: <code>0.833</code>)</td>
+                                <td><span class="badge">0.000</span></td>
+                                <td><strong>Sin mejora observada</strong></td>
                             </tr>
                             <tr>
-                                <td><strong>Verificación de Hechos (Fact-Checking)</strong></td>
-                                <td>Generación libre sin citas (Riesgo de alucinación)</td>
-                                <td>Trazabilidad Estricta a ID de Fuente con Abstención (T06)</td>
-                                <td><span class="badge badge-success">Cero Alucinaciones</span></td>
-                                <td><strong>100% Grounded</strong></td>
+                                <td><strong>Presencia de IDs de cita</strong></td>
+                                <td>Sin baseline medido</td>
+                                <td>100% en este evaluador; soporte semántico no medido</td>
+                                <td><span class="badge">No medido</span></td>
+                                <td><strong>No acredita cero alucinaciones</strong></td>
                             </tr>
                         </tbody>
                     </table>

@@ -36,3 +36,6 @@ def test_static_assets_served() -> None:
     assert resp_js.status_code == 200
     assert "javascript" in resp_js.headers["content-type"]
     assert "selectFicha" in resp_js.text
+    assert "data.discrepancia_detectada" in resp_js.text
+    assert "data.hay_contradiccion" not in resp_js.text
+    assert "Ejecutar benchmark de desarrollo" in resp_js.text

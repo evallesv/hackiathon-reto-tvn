@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="btn btn-secondary" onclick="window.openReviewModal('${ficha.id_caso}', 'requiere_evidencia')">
                         ⚠️ Requerir Evidencia
                     </button>
-                    <button class="btn btn-danger" onclick="window.openReviewModal('${ficha.id_caso}', 'rechazado')">
+                    <button class="btn btn-danger" onclick="window.openReviewModal('${ficha.id_caso}', 'descartado')">
                         ✕ Rechazar
                     </button>
                 </div>
@@ -579,17 +579,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (res.ok) {
                     const data = await res.json();
-                    if (data.hay_contradiccion) {
+                    if (data.discrepancia_detectada) {
                         elements.contraResult.className = 'contra-result-box contra-detected';
                         elements.contraResult.innerHTML = `
-                            <strong>⚠️ Contradicción Factual Detectada (Confianza: ${(data.confianza * 100).toFixed(0)}%)</strong>
-                            <p style="margin-top:0.25rem;">Explicación: ${escapeHtml(data.explicacion)}</p>
+                            <strong>⚠️ Posible contradicción (probabilidad del modelo: ${(data.probabilidad_discrepancia * 100).toFixed(0)}%)</strong>
+                            <p style="margin-top:0.25rem;">${escapeHtml(data.accion)}</p>
                         `;
                     } else {
                         elements.contraResult.className = 'contra-result-box contra-none';
                         elements.contraResult.innerHTML = `
                             <strong>✓ Sin Contradicción Factual</strong>
-                            <p style="margin-top:0.25rem;">${escapeHtml(data.explicacion)}</p>
+                            <p style="margin-top:0.25rem;">${escapeHtml(data.accion)}</p>
                         `;
                     }
                 }
@@ -613,28 +613,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateMetricsUI(data) {
-        if (data.t09_citation_coverage) {
-            elements.metricCitation.textContent = `${(data.t09_citation_coverage.citation_coverage * 100).toFixed(1)}%`;
+        const summary = data.resumen_benchmark || {};
+        const comparisons = data.comparativa_baselines || {};
+        const ranking = comparisons.ranking_priorizacion || {};
+        const contradictions = comparisons.clasificacion_contradicciones || {};
+        if (Number.isFinite(summary.cobertura_citas_porcentaje)) {
+            elements.metricCitation.textContent = `${summary.cobertura_citas_porcentaje.toFixed(1)}%`;
         }
-        if (data.t06_explicit_abstention) {
-            elements.metricAbstention.textContent = `${(data.t06_explicit_abstention.abstention_rate * 100).toFixed(1)}%`;
+        if (Number.isFinite(summary.tasa_abstencion_porcentaje)) {
+            elements.metricAbstention.textContent = `${summary.tasa_abstencion_porcentaje.toFixed(1)}%`;
         }
-        if (data.t07_adversarial_safety) {
-            elements.metricInjection.textContent = `${(data.t07_adversarial_safety.injection_defense_rate * 100).toFixed(1)}%`;
+        if (Number.isFinite(summary.resistencia_adversarial_porcentaje)) {
+            elements.metricInjection.textContent = `${summary.resistencia_adversarial_porcentaje.toFixed(1)}%`;
         }
-        if (data.precision_at_5) {
-            elements.metricP5Gain.textContent = `+${data.precision_at_5.relative_gain_pct.toFixed(1)}%`;
+        const baselineP5 = ranking.baseline_recencia?.precision_at_5;
+        const copilotP5 = ranking.copilot_score_p?.precision_at_5;
+        if (Number.isFinite(baselineP5) && Number.isFinite(copilotP5)) {
+            const relativeGain = baselineP5 > 0 ? ((copilotP5 - baselineP5) / baselineP5) * 100 : 0;
+            elements.metricP5Gain.textContent = `${relativeGain >= 0 ? '+' : ''}${relativeGain.toFixed(1)}%`;
         }
-        if (data.decision_classification_macro_f1) {
-            elements.metricF1.textContent = data.decision_classification_macro_f1.f1_system_one_decision.toFixed(3);
+        if (Number.isFinite(contradictions.system_one_ia?.f1)) {
+            elements.metricF1.textContent = contradictions.system_one_ia.f1.toFixed(3);
         }
-        if (data.latency_ms) {
-            elements.metricLatency.textContent = `${data.latency_ms.median_latency_ms.toFixed(1)} ms`;
+        if (Number.isFinite(summary.latencia_mediana_ms)) {
+            elements.metricLatency.textContent = `${summary.latencia_mediana_ms.toFixed(1)} ms`;
         }
     }
 
     async function runBenchmark() {
-        elements.btnRunBenchmark.innerHTML = `<span>⏳ Evaluando 60 Consultas...</span>`;
+        elements.btnRunBenchmark.innerHTML = `<span>⏳ Evaluando consultas de desarrollo...</span>`;
         elements.btnRunBenchmark.disabled = true;
 
         try {
@@ -642,14 +649,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const data = await res.json();
                 updateMetricsUI(data);
-                elements.btnRunBenchmark.innerHTML = `<span>✓ Benchmark Completado</span>`;
+                elements.btnRunBenchmark.innerHTML = `<span>✓ Resultados de desarrollo cargados</span>`;
                 setTimeout(() => {
-                    elements.btnRunBenchmark.innerHTML = `<span>▶ Ejecutar Benchmark en Vivo</span>`;
+                    elements.btnRunBenchmark.innerHTML = `<span>▶ Ejecutar benchmark de desarrollo</span>`;
                     elements.btnRunBenchmark.disabled = false;
                 }, 3000);
             }
         } catch {
-            elements.btnRunBenchmark.innerHTML = `<span>▶ Ejecutar Benchmark en Vivo</span>`;
+            elements.btnRunBenchmark.innerHTML = `<span>▶ Ejecutar benchmark de desarrollo</span>`;
             elements.btnRunBenchmark.disabled = false;
         }
     }
@@ -690,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const titles = {
             'aprobado_como_borrador': 'Aprobar Caso como Borrador Editorial',
             'requiere_evidencia': 'Marcar Caso como Requiere Mayor Evidencia',
-            'rechazado': 'Rechazar Caso para la Agenda Editorial',
+            'descartado': 'Descartar Caso de la Agenda Editorial',
         };
         elements.modalTitle.textContent = titles[targetState] || 'Actualizar Revisión';
         elements.modalDesc.textContent = `Caso ${idCaso}: La decisión será registrada en la base de datos persistente SQLite con auditoría de usuario.`;
