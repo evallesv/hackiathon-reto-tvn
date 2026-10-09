@@ -59,6 +59,30 @@ async def test_gdelt_seendate_is_detection_time_not_publication_time(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_gdelt_rate_limit_is_reported_to_caller(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status_code = 429
+        text = "rate limit"
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    with pytest.raises(RuntimeError, match="HTTP 429"):
+        await LiveDataFetcher().fetch_gdelt()
+
+
+@pytest.mark.asyncio
 async def test_world_bank_fetch_accepts_full_challenge_year_range(monkeypatch: pytest.MonkeyPatch) -> None:
     requested_urls: list[str] = []
 

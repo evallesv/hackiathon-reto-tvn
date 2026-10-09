@@ -147,13 +147,11 @@ class LiveDataFetcher:
             ) as client:
                 resp = await client.get(gdelt_url)
                 if resp.status_code != 200:
-                    logger.warning(f"GDELT returned HTTP {resp.status_code}")
-                    return []
+                    raise RuntimeError(f"GDELT returned HTTP {resp.status_code}")
 
                 content_type = resp.headers.get("content-type", "")
                 if "json" not in content_type and not resp.text.strip().startswith("{"):
-                    logger.warning(f"GDELT returned non-JSON response (possibly rate limit warning): {resp.text[:120]}")
-                    return []
+                    raise RuntimeError(f"GDELT returned non-JSON response: {resp.text[:120]}")
 
                 data = resp.json()
                 articles = data.get("articles", [])
@@ -202,6 +200,7 @@ class LiveDataFetcher:
                 logger.info(f"Fetched {len(records)} live news items from GDELT")
         except Exception as exc:
             logger.warning(f"GDELT fetch encountered error: {exc}")
+            raise
 
         return records
 

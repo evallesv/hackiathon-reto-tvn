@@ -1,6 +1,5 @@
 """Build a challenge-compliant data snapshot in an isolated candidate directory."""
 
-import asyncio
 import csv
 import json
 from datetime import datetime, timedelta, timezone
@@ -35,9 +34,8 @@ INDICATOR_FIELDS = (
     "licencia",
 )
 GDELT_QUERIES = (
-    "panama (economia OR logística OR turismo)",
-    "panama (gobierno OR salud OR educación OR seguridad)",
-    "panama (Canal OR infraestructura OR ambiente OR energía)",
+    "panama (economia OR logística OR turismo OR gobierno OR salud OR educación OR seguridad "
+    "OR Canal OR infraestructura OR ambiente OR energía)",
 )
 
 
@@ -71,17 +69,18 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
     except Exception as exc:
         tvn = []
         source_errors["tvn_rss"] = str(exc)
-    gdelt_batches = await asyncio.gather(
-        *(
-            fetcher.fetch_gdelt(
-                query=query,
+    try:
+        gdelt_batches = [
+            await fetcher.fetch_gdelt(
+                query=GDELT_QUERIES[0],
                 max_records=250,
                 start_datetime=start_gdelt,
                 end_datetime=end_gdelt,
             )
-            for query in GDELT_QUERIES
-        )
-    )
+        ]
+    except Exception as exc:
+        gdelt_batches = []
+        source_errors["gdelt"] = str(exc)
     news_by_url: dict[str, dict[str, Any]] = {}
     for article in [*tvn, *(item for batch in gdelt_batches for item in batch)]:
         url = str(article.get("url", "")).strip()
