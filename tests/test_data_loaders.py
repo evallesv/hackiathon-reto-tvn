@@ -28,6 +28,18 @@ def test_load_indicadores_null_preservation() -> None:
     assert len(null_entries) >= 1
 
 
+def test_load_indicadores_preserves_missing_country_and_year_as_null(tmp_path: Path) -> None:
+    path = tmp_path / "indicadores.csv"
+    path.write_text("pais_iso3,indicador_id,anio,valor,unidad\n,NY.GDP.MKTP.CD,,12.5,USD\n", encoding="utf-8")
+
+    indicadores = LocalStorageRepository().load_indicadores(path)
+
+    assert len(indicadores) == 1
+    assert indicadores[0].pais_iso3 is None
+    assert indicadores[0].indicador_id == "NY.GDP.MKTP.CD"
+    assert indicadores[0].anio is None
+
+
 def test_load_eventos_geojson() -> None:
     repo = LocalStorageRepository()
     eventos = repo.load_eventos(Path("data/raw/eventos.geojson"))
@@ -83,3 +95,59 @@ def test_event_grouper_deduplication() -> None:
     assert len(clusters) == 1
     grouped_items = list(clusters.values())[0]
     assert len(grouped_items) == 2
+
+
+def test_event_grouper_matches_paraphrased_headlines_with_shared_entities() -> None:
+    first = Noticia(
+        id_noticia="N1",
+        titulo="Canal de Panamá reduce tránsito por sequía",
+        url="https://tvn.com/1",
+        medio="TVN",
+        fecha_publicacion="2026-10-01",
+        fecha_deteccion="2026-10-01",
+        fecha_extraccion="2026-10-01",
+        tema="logistica",
+        origen="rss",
+    )
+    paraphrase = Noticia(
+        id_noticia="N2",
+        titulo="Sequía obliga al Canal de Panamá a limitar el tránsito",
+        url="https://critica.com/2",
+        medio="Critica",
+        fecha_publicacion="2026-10-02",
+        fecha_deteccion="2026-10-02",
+        fecha_extraccion="2026-10-02",
+        tema="logistica",
+        origen="rss",
+    )
+
+    clusters = EventGrouper.group_articles([first, paraphrase])
+
+    assert len(clusters) == 1
+    assert len(next(iter(clusters.values()))) == 2
+
+
+def test_event_grouper_does_not_merge_different_events_with_generic_opening() -> None:
+    first = Noticia(
+        id_noticia="N1",
+        titulo="Gobierno anuncia plan de seguridad nacional",
+        url="https://tvn.com/1",
+        medio="TVN",
+        fecha_publicacion="2026-10-01",
+        fecha_deteccion="2026-10-01",
+        fecha_extraccion="2026-10-01",
+        tema="politica",
+        origen="rss",
+    )
+    second = first.model_copy(
+        update={
+            "id_noticia": "N2",
+            "titulo": "Gobierno anuncia plan de vacunación escolar",
+            "url": "https://critica.com/2",
+            "medio": "Critica",
+        }
+    )
+
+    clusters = EventGrouper.group_articles([first, second])
+
+    assert len(clusters) == 2

@@ -85,6 +85,25 @@ def test_sqlite_snapshot_preserves_records_nulls_and_source_manifest(tmp_path: P
     assert not snapshot.has_table("fichas_casos")
 
 
+def test_sqlite_snapshot_keeps_indicator_rows_with_missing_identity_fields(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    _create_source_data(source)
+    indicator_path = source / "raw" / "indicadores.csv"
+    indicator_path.write_text(
+        indicator_path.read_text(encoding="utf-8") + ",,,,,,,\n",
+        encoding="utf-8",
+    )
+    LocalStorageRepository().generate_manifest(source)
+
+    snapshot_dir = tmp_path / "snapshot"
+    snapshot = SQLiteSnapshotRepository.create_from_directory(source, snapshot_dir)
+
+    incomplete_rows = [item for item in snapshot.load_indicadores() if item.pais_iso3 is None or item.anio is None]
+    assert len(incomplete_rows) == 1
+    assert incomplete_rows[0].pais_iso3 is None
+    assert incomplete_rows[0].anio is None
+
+
 def test_sqlite_snapshot_opens_read_only_and_refuses_overwrite(tmp_path: Path) -> None:
     source = tmp_path / "source"
     _create_source_data(source)

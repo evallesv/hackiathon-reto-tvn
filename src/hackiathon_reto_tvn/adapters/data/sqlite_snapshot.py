@@ -222,7 +222,7 @@ def _write_snapshot_database(
             );
             CREATE INDEX idx_snapshot_noticias_fecha ON noticias(fecha_publicacion DESC);
             CREATE TABLE indicadores (
-                pais_iso3 TEXT NOT NULL, indicador_id TEXT NOT NULL, anio INTEGER NOT NULL, valor REAL,
+                pais_iso3 TEXT, indicador_id TEXT, anio INTEGER, valor REAL,
                 unidad TEXT NOT NULL, fuente_url TEXT NOT NULL, fecha_extraccion TEXT NOT NULL, licencia TEXT NOT NULL,
                 PRIMARY KEY (pais_iso3, indicador_id, anio)
             );
@@ -366,7 +366,10 @@ def _merge_news(frozen: list[Noticia], live: list[Noticia]) -> list[Noticia]:
 def _merge_indicators(frozen: list[Indicador], live: list[Indicador]) -> list[Indicador]:
     merged = {(item.pais_iso3, item.indicador_id, item.anio): item for item in frozen}
     merged.update({(item.pais_iso3, item.indicador_id, item.anio): item for item in live})
-    return sorted(merged.values(), key=lambda item: (item.pais_iso3, item.indicador_id, item.anio))
+    return sorted(
+        merged.values(),
+        key=lambda item: (item.pais_iso3 or "", item.indicador_id or "", item.anio if item.anio is not None else -1),
+    )
 
 
 def _complete_indicator_grid(indicators: list[Indicador], extracted_at: str) -> list[Indicador]:
@@ -385,7 +388,10 @@ def _complete_indicator_grid(indicators: list[Indicador], extracted_at: str) -> 
             fecha_extraccion=extracted_at,
             licencia="CC BY 4.0",
         )
-    return sorted(merged.values(), key=lambda item: (item.pais_iso3, item.indicador_id, item.anio))
+    return sorted(
+        merged.values(),
+        key=lambda item: (item.pais_iso3 or "", item.indicador_id or "", item.anio if item.anio is not None else -1),
+    )
 
 
 def _merge_events(frozen: list[EventoGeoJSON], live: list[EventoGeoJSON]) -> list[EventoGeoJSON]:

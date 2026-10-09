@@ -109,7 +109,7 @@ def _audit_indicator_rows(rows: list[dict[str, Any]]) -> dict[str, Any]:
     for row in rows:
         try:
             key = (row["pais_iso3"].strip(), row["indicador_id"].strip(), int(row["anio"]))
-        except (KeyError, TypeError, ValueError):
+        except (AttributeError, KeyError, TypeError, ValueError):
             invalid_rows += 1
             continue
         if key not in EXPECTED_INDICATOR_KEYS:

@@ -61,9 +61,9 @@ class Noticia(BaseModel):
 class Indicador(BaseModel):
     """Contrato de datos para indicadores.csv (Banco Mundial / SBP)."""
 
-    pais_iso3: str
-    indicador_id: str
-    anio: int
+    pais_iso3: Optional[str]
+    indicador_id: Optional[str]
+    anio: Optional[int]
     valor: Optional[float] = None
     unidad: str
     fuente_url: str
