@@ -7,6 +7,7 @@ Provides real-time ingestion from the official sources specified in the hackatho
 4. USGS Earthquake Hazards Program GeoJSON API (Panama regional seismic box)
 """
 
+import asyncio
 import email.utils
 import hashlib
 import logging
@@ -222,54 +223,64 @@ class LiveDataFetcher:
 
         records: list[dict[str, Any]] = []
         now_utc = datetime.now(timezone.utc).isoformat()
+        semaphore = asyncio.Semaphore(6)
 
         async with httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT},
             timeout=self.timeout,
             follow_redirects=True,
         ) as client:
-            for country in target_countries:
-                for indicator in target_indicators:
-                    url = (
-                        f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
-                        f"?date={start_year}:{end_year}&format=json"
-                    )
-                    try:
+
+            async def fetch_indicator(country: str, indicator: str) -> list[dict[str, Any]]:
+                url = (
+                    f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
+                    f"?date={start_year}:{end_year}&format=json"
+                )
+                try:
+                    async with semaphore:
                         resp = await client.get(url)
-                        if resp.status_code != 200:
-                            continue
-                        data = resp.json()
-                        if not isinstance(data, list) or len(data) < 2:
-                            continue
+                    if resp.status_code != 200:
+                        return []
+                    data = resp.json()
+                    if not isinstance(data, list) or len(data) < 2 or not isinstance(data[1], list):
+                        return []
 
-                        entries = data[1]
-                        if not isinstance(entries, list):
-                            continue
+                    found: list[dict[str, Any]] = []
+                    for item in data[1]:
+                        val = item.get("value")
+                        date_year = item.get("date")
+                        if date_year:
+                            found.append(
+                                {
+                                    "pais_iso3": country,
+                                    "indicador_id": indicator,
+                                    "anio": int(date_year),
+                                    "valor": float(val) if val is not None else None,
+                                    "unidad": (
+                                        "personas"
+                                        if indicator == "SP.POP.TOTL"
+                                        else "%"
+                                        if "ZG" in indicator or "ZS" in indicator
+                                        else "unidad"
+                                    ),
+                                    "fuente_url": url,
+                                    "fecha_extraccion": now_utc,
+                                    "licencia": "CC BY 4.0 (Banco Mundial)",
+                                }
+                            )
+                    return found
+                except Exception as exc:
+                    logger.warning(f"Error fetching WB {country}/{indicator}: {exc}")
+                    return []
 
-                        for item in entries:
-                            val = item.get("value")
-                            date_year = item.get("date")
-                            if date_year:
-                                records.append(
-                                    {
-                                        "pais_iso3": country,
-                                        "indicador_id": indicator,
-                                        "anio": int(date_year),
-                                        "valor": float(val) if val is not None else None,
-                                        "unidad": (
-                                            "personas"
-                                            if indicator == "SP.POP.TOTL"
-                                            else "%"
-                                            if "ZG" in indicator or "ZS" in indicator
-                                            else "unidad"
-                                        ),
-                                        "fuente_url": url,
-                                        "fecha_extraccion": now_utc,
-                                        "licencia": "CC BY 4.0 (Banco Mundial)",
-                                    }
-                                )
-                    except Exception as exc:
-                        logger.warning(f"Error fetching WB {country}/{indicator}: {exc}")
+            batches = await asyncio.gather(
+                *(
+                    fetch_indicator(country, indicator)
+                    for country in target_countries
+                    for indicator in target_indicators
+                )
+            )
+            records = [record for batch in batches for record in batch]
 
         logger.info(f"Fetched {len(records)} indicators from World Bank API")
         return records

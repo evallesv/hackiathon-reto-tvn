@@ -63,7 +63,7 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
     start = now - timedelta(days=90)
     start_gdelt = start.strftime("%Y%m%d%H%M%S")
     end_gdelt = now.strftime("%Y%m%d%H%M%S")
-    fetcher = LiveDataFetcher(timeout_seconds=40)
+    fetcher = LiveDataFetcher(timeout_seconds=15)
     source_errors: dict[str, str] = {}
 
     try:

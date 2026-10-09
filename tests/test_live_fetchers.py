@@ -1,5 +1,6 @@
 """Tests for live data fetchers (offline with mocks per T10)."""
 
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -90,6 +91,80 @@ async def test_world_bank_fetch_accepts_full_challenge_year_range(monkeypatch: p
     assert records[0]["anio"] == 2010
     assert records[0]["valor"] is None
     assert "date=2010:2024" in requested_urls[0]
+
+
+@pytest.mark.asyncio
+async def test_world_bank_fetch_keeps_successful_indicators_when_one_request_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Response:
+        status_code = 200
+
+        def json(self) -> list[object]:
+            return [{}, [{"date": "2024", "value": 2.5}]]
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            if "CRI/indicator/FP.CPI" in url:
+                raise OSError("simulated timeout")
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    records = await LiveDataFetcher().fetch_world_bank(
+        countries=["PAN", "CRI"],
+        indicators=["NY.GDP.MKTP.KD.ZG", "FP.CPI.TOTL.ZG"],
+        start_year=2024,
+        end_year=2024,
+    )
+
+    assert len(records) == 3
+    assert all(row["anio"] == 2024 for row in records)
+
+
+@pytest.mark.asyncio
+async def test_world_bank_fetch_runs_multiple_requests_concurrently(monkeypatch: pytest.MonkeyPatch) -> None:
+    active_requests = 0
+    peak_requests = 0
+
+    class Response:
+        status_code = 200
+
+        def json(self) -> list[object]:
+            return [{}, []]
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            nonlocal active_requests, peak_requests
+            active_requests += 1
+            peak_requests = max(peak_requests, active_requests)
+            await asyncio.sleep(0)
+            active_requests -= 1
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    await LiveDataFetcher().fetch_world_bank(
+        countries=["PAN", "CRI", "COL"], indicators=["GDP", "CPI"], start_year=2024, end_year=2024
+    )
+
+    assert 1 < peak_requests <= 6
 
 
 @pytest.mark.asyncio
