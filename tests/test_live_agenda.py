@@ -30,9 +30,9 @@ def _service(tmp_path: Path) -> tuple[CopilotService, SQLiteStorage]:
     return service, storage
 
 
-def test_agenda_prefers_recent_live_news_over_frozen_corpus(tmp_path: Path) -> None:
+def test_agenda_prefers_live_news_within_90_day_window(tmp_path: Path) -> None:
     service, storage = _service(tmp_path)
-    published = datetime.now(timezone.utc).isoformat()
+    published = (datetime.now(timezone.utc) - timedelta(days=89)).isoformat()
     storage.upsert_noticias(
         [
             {
@@ -60,7 +60,7 @@ def test_agenda_prefers_recent_live_news_over_frozen_corpus(tmp_path: Path) -> N
 
 def test_agenda_uses_labeled_snapshot_when_live_news_is_stale(tmp_path: Path) -> None:
     service, storage = _service(tmp_path)
-    stale = (datetime.now(timezone.utc) - timedelta(days=5)).isoformat()
+    stale = (datetime.now(timezone.utc) - timedelta(days=91)).isoformat()
     storage.upsert_noticias(
         [
             {

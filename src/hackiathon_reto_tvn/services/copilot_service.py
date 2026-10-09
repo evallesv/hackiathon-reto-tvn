@@ -79,7 +79,7 @@ class CopilotService:
         if self.settings.ENVIRONMENT != "test" and self.settings.SQLITE_DB_PATH.exists():
             try:
                 storage = SQLiteStorage(self.settings.SQLITE_DB_PATH)
-                cutoff = datetime.now(timezone.utc) - timedelta(hours=self.settings.LIVE_AGENDA_MAX_AGE_HOURS)
+                cutoff = datetime.now(timezone.utc) - timedelta(days=self.settings.LIVE_AGENDA_MAX_AGE_DAYS)
                 live_records = storage.get_latest_noticias(limit=500)
                 current_records: List[Noticia] = []
                 for record in live_records:

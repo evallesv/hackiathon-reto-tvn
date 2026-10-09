@@ -117,7 +117,7 @@ sequenceDiagram
     participant LLM as 7. Producir (OpenCode / Gemini)
     participant Humano as 8. Revisar (Human Review)
 
-    Ingesta->>Agrupador: Usa noticias vivas de hasta 72 h desde SQLite; si faltan, usa snapshot y lo identifica como histórico
+    Ingesta->>Agrupador: Usa noticias vivas de hasta 90 días desde SQLite; si faltan, usa snapshot y lo identifica como histórico
     Agrupador->>Contexto: Agrupa titulares similares; no infiere independencia por número de medios
     Contexto->>Decisor: Clasifica tema, estima factores R, I, U, N y detecta contradicciones (T05)
     Decisor->>MotorScore: Retorna probabilidades tipadas y flags fácticos

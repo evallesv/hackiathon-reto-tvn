@@ -104,10 +104,10 @@ class Settings(BaseSettings):
         default=60,
         description="Intervalo en minutos para la ingesta periódica en segundo plano",
     )
-    LIVE_AGENDA_MAX_AGE_HOURS: int = Field(
-        default=72,
+    LIVE_AGENDA_MAX_AGE_DAYS: int = Field(
+        default=90,
         ge=1,
-        description="Antigüedad máxima de una noticia viva para considerarla actual en la agenda",
+        description="Ventana retrospectiva máxima de noticias vivas consideradas recientes en la agenda",
     )
 
     # Notion Integration
