@@ -11,7 +11,7 @@
 
 Prototipo de **copiloto editorial y análisis de entorno con inteligencia artificial** diseñado para la 4ta edición del **HackIAthon** (Viamatica / ADEN / TVN Media).
 
-La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mundial y USGS) en una **bandeja de temas priorizados**, **fichas de evidencia trazables** y **borradores responsables** para editores y periodistas de TVN Media.
+La solución combina un corpus público congelado (para evaluación reproducible y consultas históricas) con ingesta viva de RSS TVN, GDELT, Banco Mundial y USGS. Esta información alimenta una **bandeja de temas priorizados**, **fichas de evidencia trazables** y **borradores responsables** para editores y periodistas de TVN Media.
 
 > *La innovación no consiste en producir más texto: consiste en reducir el tiempo para encontrar un tema relevante, comprobar qué evidencia existe, identificar vacíos de información y entregar un resultado 100% trazable.*
 
@@ -37,7 +37,7 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
    - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
-   - La agenda usa noticias recientes persistidas en SQLite (ventana retrospectiva configurable `LIVE_AGENDA_MAX_AGE_DAYS`, 90 días por defecto); cuando no hay ingesta utilizable en esa ventana, muestra el snapshot congelado con una advertencia visible. El entorno de pruebas sigue usando solo el snapshot.
+   - La agenda y las consultas usan primero noticias recientes persistidas en SQLite (ventana retrospectiva configurable `LIVE_AGENDA_MAX_AGE_DAYS`, 90 días por defecto), además de conservar el snapshot para preguntas históricas. Indicadores y eventos vivos se combinan por sus claves con las series congeladas. Si no hay noticia reciente, la agenda identifica claramente el respaldo histórico; el entorno de pruebas sigue usando solo el snapshot.
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
    - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
@@ -47,7 +47,7 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
 7. **Extensión Modular para Sector Banca (CU-05)**:
    - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
 8. **Persistencia Transaccional SQLite WAL y Flujo Human-in-the-Loop**:
-   - Almacenamiento persistente en SQLite (`fichas_casos`) para trazabilidad de estados (`EN_REVISION`, `APROBADO_COMO_BORRADOR`, `REQUIERE_EVIDENCIA`, `RECHAZADO`), persona revisora y notas editoriales.
+   - Almacenamiento persistente en SQLite (`fichas_casos`) para trazabilidad de estados (`EN_REVISION`, `APROBADO_COMO_BORRADOR`, `REQUIERE_EVIDENCIA`, `RECHAZADO`), persona revisora y notas editoriales; la vista de fichas une casos guardados con la agenda viva actual y restaura sus revisiones al actualizar.
    - Ingesta periódica en segundo plano de RSS, GDELT, Banco Mundial y USGS sobre volumen persistente en Fly.io (`/data/copilot.db`), estrictamente desacoplada del corpus congelado.
 9. **Toolchain Moderno con `uv`**:
    - Tiempos de instalación ultrarrápidos, resolución de dependencias bloqueada en `uv.lock`.
@@ -185,9 +185,9 @@ Una vez iniciado el servidor, accede a la documentación interactiva y explorado
 * `GET /api/v1/system/info` — Estado del runtime, conector de decisión y proveedor LLM activo.
 * `GET /api/v1/copilot/agenda?top_n=5` — Ranking de noticias priorizadas con desglose explicable de $P$.
 * `POST /api/v1/copilot/query` — **Motor de consulta en lenguaje natural** con citas verificadas y abstención explícita (**T04, T06, T07**).
-* `GET /api/v1/copilot/fichas` — Listado completo de fichas de caso con evidencias y borradores.
+* `GET /api/v1/copilot/fichas` — Casos persistidos más las fichas de la agenda viva actual, con evidencias y borradores.
 * `GET /api/v1/copilot/fichas/{id_caso}` — Detalle estructurado de una ficha de evidencia específica.
-* `GET /api/v1/copilot/fichas/export` — Exportación de fichas y estados en formato JSON para auditoría.
+* `GET /api/v1/copilot/fichas/export` — Exportación de casos persistidos y agenda viva actual en formato JSON para auditoría.
 * `POST /api/v1/copilot/generate-draft` — Generación estructurada de brief y guion TV con citas verificadas (**T09**).
 * `POST /api/v1/copilot/generate-banking-draft` — Generación de **boletín bancario macroeconómico y logístico** (**CU-05**).
 * `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).

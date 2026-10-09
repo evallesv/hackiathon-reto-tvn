@@ -22,7 +22,9 @@ from hackiathon_reto_tvn.domain.models import (
     CitaEvidencia,
     ComponentesPuntaje,
     EstadoRevision,
+    EventoGeoJSON,
     FichaCaso,
+    Indicador,
     Modalidad,
     Noticia,
     QueryResponse,
@@ -111,6 +113,60 @@ class CopilotService:
 
         noticias, _ = self.load_corpus()
         return noticias, "snapshot_congelado"
+
+    def load_query_news(self) -> List[Noticia]:
+        """Search recent live headlines first, retaining frozen records for historical questions."""
+        live_news, _ = self.load_agenda_corpus()
+        if not live_news or self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_DB_PATH.exists():
+            return live_news
+        frozen_news, _ = self.load_corpus()
+        known_ids = {news.id_noticia for news in live_news}
+        return live_news + [news for news in frozen_news if news.id_noticia not in known_ids]
+
+    def load_query_indicators(self) -> List[Indicador]:
+        """Merge live indicator observations over the frozen history by country, series, and year."""
+        indicators = self.repo.load_indicadores(self.settings.RAW_DATA_DIR / "indicadores.csv")
+        if self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_DB_PATH.exists():
+            return indicators
+        try:
+            live_rows = SQLiteStorage(self.settings.SQLITE_DB_PATH).get_latest_indicadores(limit=500)
+            merged = {(item.pais_iso3, item.indicador_id, item.anio): item for item in indicators}
+            for row in live_rows:
+                item = Indicador.model_validate(row)
+                merged[(item.pais_iso3, item.indicador_id, item.anio)] = item
+            return list(merged.values())
+        except Exception as exc:
+            logger.warning("No se pudieron leer indicadores vivos; se usará el corpus congelado: %s", exc)
+            return indicators
+
+    def load_query_events(self) -> List[EventoGeoJSON]:
+        """Merge live USGS events with the frozen regional catalog by event ID."""
+        events = self.repo.load_eventos(self.settings.RAW_DATA_DIR / "eventos.geojson")
+        if self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_DB_PATH.exists():
+            return events
+        try:
+            live_rows = SQLiteStorage(self.settings.SQLITE_DB_PATH).get_latest_eventos(limit=100)
+            merged: Dict[str, EventoGeoJSON] = {}
+            for row in live_rows:
+                item = EventoGeoJSON(
+                    id=str(row.get("id") or ""),
+                    magnitude=float(row.get("magnitude") or 0.0),
+                    time=int(row.get("time") or 0),
+                    updated=int(row.get("updated") or 0),
+                    longitude=float(row.get("longitud") or 0.0),
+                    latitude=float(row.get("latitud") or 0.0),
+                    depth=float(row.get("profundidad") or 0.0),
+                    place=str(row.get("place") or ""),
+                    status=str(row.get("status") or ""),
+                    url=str(row.get("url") or ""),
+                )
+                merged[item.id] = item
+            for event in events:
+                merged.setdefault(event.id, event)
+            return list(merged.values())
+        except Exception as exc:
+            logger.warning("No se pudieron leer eventos vivos; se usará el catálogo congelado: %s", exc)
+            return events
 
     async def prioritize_agenda_async(self, top_n: int = 5) -> List[FichaCaso]:
         """Ranks news stories into an actionable prioritized agenda asynchronously (CU-01 / CU-02).
@@ -248,6 +304,21 @@ class CopilotService:
 
         tasks = [_evaluate_cluster(idx, key, items) for idx, (key, items) in enumerate(clusters.items())]
         fichas = await asyncio.gather(*tasks)
+
+        if origen_datos == "ingesta_viva" and self.settings.SQLITE_DB_PATH.exists():
+            try:
+                persisted = SQLiteStorage(self.settings.SQLITE_DB_PATH).get_fichas_by_ids([f.id_caso for f in fichas])
+                for ficha in fichas:
+                    saved = persisted.get(ficha.id_caso)
+                    if not saved:
+                        continue
+                    saved_ficha = FichaCaso.model_validate(saved)
+                    ficha.estado_revision = saved_ficha.estado_revision
+                    ficha.persona_revisora = saved_ficha.persona_revisora
+                    ficha.observaciones_revision = saved_ficha.observaciones_revision
+                    ficha.borrador = saved_ficha.borrador
+            except Exception as exc:
+                logger.warning("No se pudieron restaurar las revisiones de la agenda viva: %s", exc)
 
         ranked = ScoringEngine.rank_cases(list(fichas))
         return ranked[:top_n]
@@ -483,7 +554,7 @@ class CopilotService:
         if any(w in q_lower for w in missing_indicators):
             abstencion = SafetyGuard.format_explicit_abstention(
                 topic_or_query=consulta,
-                missing_reason="Sin registros en el corpus oficial congelado (noticias, Banco Mundial, USGS)",
+                missing_reason="Sin registros en las fuentes disponibles (ingesta viva y snapshot histórico)",
             )
             return QueryResponse(
                 consulta=consulta,
@@ -499,7 +570,7 @@ class CopilotService:
             or "discrepan" in q_lower
             or ("vías" in q_lower and "monto" in q_lower)
         ):
-            noticias, _ = self.load_corpus()
+            noticias = self.load_query_news()
             n_inv = [
                 n
                 for n in noticias
@@ -540,7 +611,7 @@ class CopilotService:
             )
 
         # 4. Indicators queries (Banco Mundial / SBP) (T04)
-        indicadores = self.repo.load_indicadores(self.settings.RAW_DATA_DIR / "indicadores.csv")
+        indicadores = self.load_query_indicators()
 
         # Map country names / iso3
         country_map = {
@@ -644,7 +715,7 @@ class CopilotService:
                 )
 
         # 5. Seismic events (USGS)
-        eventos = self.repo.load_eventos(self.settings.RAW_DATA_DIR / "eventos.geojson")
+        eventos = self.load_query_events()
         if (
             "sismo" in q_lower
             or "terremoto" in q_lower
@@ -687,7 +758,7 @@ class CopilotService:
                 )
 
         # 6. Canal draft / calado
-        noticias, _ = self.load_corpus()
+        noticias = self.load_query_news()
         if "calado" in q_lower or "canal" in q_lower:
             year_match = re.search(r"\b(20\d{2})\b", q_lower)
             canal_news = [n for n in noticias if "calado" in n.titulo.lower()]
@@ -796,7 +867,7 @@ class CopilotService:
         # 9. Fallback: Explicit Abstention (T06)
         abstencion = SafetyGuard.format_explicit_abstention(
             topic_or_query=consulta,
-            missing_reason="No existen registros relevantes en el corpus oficial congelado",
+            missing_reason="No existen registros relevantes en las fuentes disponibles (ingesta viva y snapshot)",
         )
         return QueryResponse(
             consulta=consulta,

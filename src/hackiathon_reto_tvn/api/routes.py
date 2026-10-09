@@ -152,8 +152,9 @@ async def query_copilot(
 @router.get("/api/v1/copilot/fichas", response_model=List[FichaCaso], tags=["Copilot"])
 async def get_fichas(
     settings: Settings = Depends(get_settings),
+    service: CopilotService = Depends(get_copilot_service),
 ) -> List[FichaCaso]:
-    """Retrieves all tracked case cards (fichas) from persistent SQLite storage (CU-02)."""
+    """Lists persisted cases together with the current live agenda."""
     from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 
     storage = SQLiteStorage(settings.SQLITE_DB_PATH)
@@ -164,11 +165,18 @@ async def get_fichas(
         if seed_path.exists():
             storage.seed_fichas_from_jsonl(seed_path)
             fichas_raw = storage.get_all_fichas()
-    return [FichaCaso.model_validate(f) for f in fichas_raw]
+    fichas = {f.id_caso: f for f in (FichaCaso.model_validate(raw) for raw in fichas_raw)}
+    if settings.ENVIRONMENT != "test":
+        live_agenda = await service.prioritize_agenda_async(top_n=20)
+        for ficha in live_agenda:
+            if ficha.origen_datos == "ingesta_viva":
+                fichas[ficha.id_caso] = ficha
+    return sorted(fichas.values(), key=lambda ficha: (-ficha.puntaje, ficha.id_caso))
 
 
 @router.get("/api/v1/copilot/fichas/export", tags=["Copilot"])
 async def export_fichas(
+    service: CopilotService = Depends(get_copilot_service),
     settings: Settings = Depends(get_settings),
 ) -> List[Dict[str, Any]]:
     """Exports all case cards as a list of dictionaries for downstream auditing."""
@@ -182,13 +190,20 @@ async def export_fichas(
         if seed_path.exists():
             storage.seed_fichas_from_jsonl(seed_path)
             fichas_raw = storage.get_all_fichas()
-    return fichas_raw
+    fichas = {str(raw["id_caso"]): raw for raw in fichas_raw}
+    if settings.ENVIRONMENT != "test":
+        live_agenda = await service.prioritize_agenda_async(top_n=20)
+        for ficha in live_agenda:
+            if ficha.origen_datos == "ingesta_viva":
+                fichas[ficha.id_caso] = ficha.model_dump()
+    return sorted(fichas.values(), key=lambda ficha: (-float(ficha.get("puntaje", 0.0)), str(ficha["id_caso"])))
 
 
 @router.get("/api/v1/copilot/fichas/{id_caso}", response_model=FichaCaso, tags=["Copilot"])
 async def get_ficha_by_id(
     id_caso: str,
     settings: Settings = Depends(get_settings),
+    service: CopilotService = Depends(get_copilot_service),
 ) -> FichaCaso:
     """Retrieves a single case card by ID."""
     from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
@@ -201,6 +216,10 @@ async def get_ficha_by_id(
         if seed_path.exists():
             storage.seed_fichas_from_jsonl(seed_path)
             raw = storage.get_ficha(id_caso)
+    if not raw and settings.ENVIRONMENT != "test":
+        live_case = await service.get_agenda_case(id_caso)
+        if live_case and live_case.origen_datos == "ingesta_viva":
+            return live_case
     if not raw:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

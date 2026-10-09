@@ -462,6 +462,48 @@ class SQLiteStorage:
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_latest_indicadores(self, limit: int = 500) -> list[dict[str, Any]]:
+        """Return stored live indicator observations, newest extraction first."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT pais_iso3, indicador_id, anio, valor, unidad,
+                       fuente_url, fecha_extraccion, licencia
+                FROM indicadores_live
+                ORDER BY fecha_extraccion DESC, anio DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_latest_eventos(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return live seismic events ordered by event time, newest first."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, magnitude, place, time, updated, url,
+                       latitud, longitud, profundidad, status
+                FROM eventos_live
+                ORDER BY time DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
+    def get_fichas_by_ids(self, ids_caso: list[str]) -> dict[str, dict[str, Any]]:
+        """Return persisted case cards for a set of stable case IDs."""
+        if not ids_caso:
+            return {}
+        placeholders = ",".join("?" for _ in ids_caso)
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                f"SELECT id_caso, ficha_json FROM fichas_casos WHERE id_caso IN ({placeholders})",
+                ids_caso,
+            ).fetchall()
+            return {str(row["id_caso"]): json.loads(row["ficha_json"]) for row in rows}
+
     def get_latest_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         """Return recent ingestion run logs."""
         with self.get_connection() as conn:

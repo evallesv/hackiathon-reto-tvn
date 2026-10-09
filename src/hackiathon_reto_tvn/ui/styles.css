@@ -618,6 +618,11 @@ body {
     font-weight: 600;
     line-height: 1.3;
 }
+.ci-source {
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
 
 /* Detail Card Content */
 .ficha-detail-card {

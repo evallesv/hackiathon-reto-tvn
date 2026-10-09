@@ -293,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const isActive = f.id_caso === state.selectedFichaId ? 'active' : '';
             const borrador = f.borrador || {};
             const titulo = borrador.titulo_propuesto || borrador.resumen_250 || (f.afirmaciones && f.afirmaciones[0] ? f.afirmaciones[0].texto : `Caso ${f.id_caso}`);
+            const sourceLabel = f.origen_datos === 'ingesta_viva' ? 'En vivo' : 'Histórico';
             return `
                 <div class="case-item ${isActive}" onclick="window.selectFicha('${f.id_caso}')">
                     <div class="ci-top">
@@ -300,6 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="ci-score">P: ${f.puntaje.toFixed(1)}</span>
                     </div>
                     <div class="ci-title">${escapeHtml(titulo.substring(0, 80))}${titulo.length > 80 ? '...' : ''}</div>
+                    <div class="ci-source">Fuente: ${sourceLabel}</div>
                 </div>
             `;
         }).join('');
@@ -325,6 +327,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const titulo = borrador.titulo_propuesto || borrador.resumen_250 || `Caso ${ficha.id_caso}`;
         const canPublish = ficha.estado_evidencia === 'suficiente_para_borrador';
         const isBanking = ficha.modalidad === 'banca' || !!borrador.resumen_250;
+        const sourceLabel = ficha.origen_datos === 'ingesta_viva' ? 'Ingesta viva' : 'Snapshot histórico';
+        const sourceDate = ficha.fecha_actualizacion_fuente ? new Date(ficha.fecha_actualizacion_fuente) : null;
+        const sourceDateLabel = sourceDate && !Number.isNaN(sourceDate.getTime())
+            ? sourceDate.toLocaleString('es-PA', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Panama' })
+            : 'fecha no disponible';
 
         // Affirmations table HTML
         const affirmationsRows = (ficha.afirmaciones || []).map(af => {
@@ -447,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="badge badge-alto">Puntaje: ${ficha.puntaje.toFixed(1)}</span>
                         <span class="badge badge-ev-${(ficha.estado_evidencia || 'parcial').toLowerCase()}">Evidencia: ${(ficha.estado_evidencia || 'parcial').replace(/_/g, ' ')}</span>
                         <span class="badge" style="background:rgba(255,255,255,0.06); color:#94A3B8;">Modalidad: ${ficha.modalidad || 'TVN'}</span>
+                        <span class="badge" style="background:rgba(255,255,255,0.06); color:#94A3B8;">${sourceLabel} · ${sourceDateLabel}</span>
                     </div>
                 </div>
             </div>
