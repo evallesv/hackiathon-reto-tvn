@@ -18,7 +18,7 @@ help:
 	@echo "  make typecheck     - Verificar tipos estáticos con mypy"
 	@echo "  make check         - Gate completo: ruff + format-check + mypy + pytest (ejecutar antes de terminar)"
 	@echo "  make test          - Ejecutar suite completa con pytest y cobertura"
-	@echo "  make benchmark     - Ejecutar suite de evaluación de 60 consultas y baselines de IA"
+	@echo "  make benchmark     - Ejecutar el conjunto de desarrollo (40 consultas) y sus baselines"
 	@echo "  make run           - Levantar servidor FastAPI localmente en puerto 8080"
 	@echo "  make cli           - Ver estado del CLI del copiloto"
 	@echo "  make manifest      - Regenerar manifest.json con hashes SHA-256"

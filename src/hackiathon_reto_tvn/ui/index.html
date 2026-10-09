@@ -279,13 +279,13 @@
                     <span class="kpi-target">Cinco casos; etiquetas por palabras clave, evaluación exploratoria</span>
                 </div>
                 <div class="kpi-card">
-                    <span class="kpi-label">F1 de contradicción (regla mock)</span>
+                    <span class="kpi-label">Macro-F1 de contradicción</span>
                     <div class="kpi-value text-gold" id="metric-f1">—</div>
-                    <span class="kpi-target">Muestra sintética; no es macro-F1 ni mide el modelo real</span>
+                    <span class="kpi-target" id="metric-f1-target">Pares sintéticos; el proveedor y modelo aparecen en el resultado</span>
                 </div>
                 <div class="kpi-card">
                     <span class="kpi-label">Latencia Mediana P50</span>
-                    <div class="kpi-value text-info" id="metric-latency">0.7 ms</div>
+                    <div class="kpi-value text-info" id="metric-latency">—</div>
                     <span class="kpi-target">Latencia del modo y proveedor indicados en el resultado</span>
                 </div>
             </div>
@@ -314,8 +314,8 @@
                             </tr>
                             <tr>
                                 <td><strong>Detección de contradicciones, muestra sintética</strong></td>
-                                <td>Regex (F1 clase positiva: <code>0.833</code>)</td>
-                                <td>Regla mock, no modelo System One (F1: <code>0.833</code>)</td>
+                                <td>Regex (Macro-F1 calculado en cada ejecución)</td>
+                                <td>Adaptador configurado (Macro-F1 calculado en cada ejecución)</td>
                                 <td><span class="badge">0.000</span></td>
                                 <td><strong>Sin mejora observada</strong></td>
                             </tr>

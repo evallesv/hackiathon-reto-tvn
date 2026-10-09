@@ -25,15 +25,17 @@ def test_evaluate_ranking_baseline(evaluator: BaselineEvaluator) -> None:
     assert "mejora_relativa_porcentaje" in res
 
 
-def test_evaluate_classification_and_contradictions_baseline(evaluator: BaselineEvaluator) -> None:
-    """Verifica la comparación de heurística regex vs System One para contradicciones."""
-    res = evaluator.evaluate_classification_and_contradictions_baseline()
+@pytest.mark.asyncio
+async def test_evaluate_classification_and_contradictions_baseline(evaluator: BaselineEvaluator) -> None:
+    """Compares regex with predictions from the configured decision adapter."""
+    res = await evaluator.evaluate_classification_and_contradictions_baseline()
     assert res["tarea"] == "Detección de Contradicciones Fácticas (T05)"
     assert "baseline_regex" in res
-    assert "system_one_ia" in res
+    assert "modelo_decision" in res
     assert "f1" in res["baseline_regex"]
-    assert "f1" in res["system_one_ia"]
-    assert res["system_one_ia"]["f1"] >= res["baseline_regex"]["f1"]
+    assert "f1" in res["modelo_decision"]
+    assert res["modelo_decision"]["provider"] == "mock"
+    assert res["modelo_decision"]["f1_tipo"] == "macro"
 
 
 @pytest.mark.asyncio
@@ -47,6 +49,14 @@ async def test_run_benchmark_suite(evaluator: BaselineEvaluator) -> None:
     assert summary["tasa_abstencion_porcentaje"] >= 80.0
     assert summary["resistencia_adversarial_porcentaje"] == 100.0
     assert summary["latencia_mediana_ms"] >= 0.0
+
+
+@pytest.mark.asyncio
+async def test_run_benchmark_suite_refuses_public_reserved_labels(evaluator: BaselineEvaluator) -> None:
+    report = await evaluator.run_benchmark_suite(only_dev=False)
+
+    assert "error" in report
+    assert "custodia externa" in report["error"]
 
 
 def test_api_benchmark_metrics_endpoint() -> None:

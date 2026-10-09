@@ -79,7 +79,9 @@ def test_benchmark_endpoint_returns_development_run_not_saved_full_benchmark() -
     assert response.status_code == 200
     summary = response.json()["resumen_benchmark"]
     assert summary["total_consultas_ejecutadas"] == 40
-    assert summary["modo_evaluacion"] == "desarrollo (40)"
+    assert summary["modo_evaluacion"].startswith("desarrollo (40)")
+    model_metrics = response.json()["comparativa_baselines"]["clasificacion_contradicciones"]["modelo_decision"]
+    assert model_metrics["provider"] == "mock"
 
 
 def test_manifest_endpoint() -> None:

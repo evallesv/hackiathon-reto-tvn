@@ -33,6 +33,18 @@ class BaselineEvaluator:
         self.service = service or CopilotService(settings=self.settings)
         self.repo = LocalStorageRepository()
 
+    def _offline_evaluation_service(self) -> CopilotService:
+        """Build an evaluator service pinned to the packaged corpus, excluding mutable live SQLite data."""
+        evaluation_settings = self.settings.model_copy(
+            update={"SQLITE_DB_PATH": self.settings.DATA_DIR / ".benchmark-live-ingestion-disabled.db"}
+        )
+        return CopilotService(
+            settings=evaluation_settings,
+            llm_client=self.service.llm,
+            decision_client=self.service.decision_client,
+            repository=self.repo,
+        )
+
     def evaluate_ranking_baseline(
         self,
         noticias: Optional[List[Noticia]] = None,
@@ -45,7 +57,10 @@ class BaselineEvaluator:
         - Measures Precision@5 against ground-truth editorial relevance.
         """
         if noticias is None:
-            noticias, _ = self.service.load_corpus()
+            ranking_service = self._offline_evaluation_service()
+            noticias, _ = ranking_service.load_corpus()
+        else:
+            ranking_service = self.service
 
         if not noticias:
             return {"error": "Corpus vacío"}
@@ -68,15 +83,13 @@ class BaselineEvaluator:
         baseline_p_at_5 = baseline_relevant_count / max(1, len(baseline_top))
 
         # Copilot: Agenda ranking via CopilotService
-        copilot_agenda = self.service.prioritize_agenda(top_n=top_n)
+        copilot_agenda = ranking_service.prioritize_agenda(top_n=top_n)
         copilot_top_titles = [c.afirmaciones[0].texto.lower() if c.afirmaciones else "" for c in copilot_agenda]
         copilot_relevant_count = sum(1 for t in copilot_top_titles if any(k in t for k in relevant_keywords))
         copilot_p_at_5 = copilot_relevant_count / max(1, len(copilot_agenda))
 
         # Relative improvement
-        improvement_pct = (
-            ((copilot_p_at_5 - baseline_p_at_5) / baseline_p_at_5 * 100.0) if baseline_p_at_5 > 0 else 100.0
-        )
+        improvement_pct = (copilot_p_at_5 - baseline_p_at_5) / baseline_p_at_5 * 100.0 if baseline_p_at_5 > 0 else None
 
         return {
             "tarea": "Ranking y Priorización Editorial",
@@ -91,15 +104,16 @@ class BaselineEvaluator:
                 "precision_at_5": round(copilot_p_at_5, 3),
                 "casos_relevantes": copilot_relevant_count,
                 "total_evaluados": len(copilot_agenda),
-                "ventaja_ia": "Penaliza urgencia en recirculaciones (T03) y prioriza impacto y evidencia verificable.",
+                "descripcion": "Puntaje de atención P calculado para las mismas noticias del corpus evaluado.",
             },
-            "mejora_relativa_porcentaje": round(improvement_pct, 1),
+            "mejora_relativa_porcentaje": round(improvement_pct, 1) if improvement_pct is not None else None,
+            "limite_mejora_relativa": "No se calcula si la precisión baseline es cero; el valor 0 frente a 0 no implica mejora.",
         }
 
-    def evaluate_classification_and_contradictions_baseline(self) -> Dict[str, Any]:
-        """Task B: Compares simple regex keyword rules against System One decision evaluation.
+    async def evaluate_classification_and_contradictions_baseline(self) -> Dict[str, Any]:
+        """Task B: Compare regex labels with predictions from the configured decision adapter.
 
-        Measures Macro-F1 on contradiction detection and claim typification.
+        Measures macro-F1 on a small synthetic contradiction set; it is not an independent editorial test set.
         """
         # Evaluation test samples (synthetic & verified)
         eval_pairs = [
@@ -129,31 +143,44 @@ class BaselineEvaluator:
         baseline_preds = [regex_baseline_discrepancy(a, b) for a, b, _ in eval_pairs]
         actuals = [expected for _, _, expected in eval_pairs]
 
-        def compute_metrics(y_true: List[bool], y_pred: List[bool]) -> Dict[str, float]:
+        def compute_metrics(y_true: List[bool], y_pred: List[bool]) -> Dict[str, Any]:
             tp = sum(1 for yt, yp in zip(y_true, y_pred, strict=True) if yt and yp)
             fp = sum(1 for yt, yp in zip(y_true, y_pred, strict=True) if not yt and yp)
             fn = sum(1 for yt, yp in zip(y_true, y_pred, strict=True) if yt and not yp)
             tn = sum(1 for yt, yp in zip(y_true, y_pred, strict=True) if not yt and not yp)
 
-            prec = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            rec = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = (2 * prec * rec) / (prec + rec) if (prec + rec) > 0 else 0.0
+            positive_precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            positive_recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            positive_f1 = (
+                2 * positive_precision * positive_recall / (positive_precision + positive_recall)
+                if positive_precision + positive_recall > 0
+                else 0.0
+            )
+            negative_precision = tn / (tn + fn) if (tn + fn) > 0 else 0.0
+            negative_recall = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+            negative_f1 = (
+                2 * negative_precision * negative_recall / (negative_precision + negative_recall)
+                if negative_precision + negative_recall > 0
+                else 0.0
+            )
             acc = (tp + tn) / len(y_true) if len(y_true) > 0 else 0.0
-            return {"precision": round(prec, 3), "recall": round(rec, 3), "f1": round(f1, 3), "accuracy": round(acc, 3)}
+            return {
+                "precision": round(positive_precision, 3),
+                "recall": round(positive_recall, 3),
+                "f1": round((positive_f1 + negative_f1) / 2, 3),
+                "f1_positivo": round(positive_f1, 3),
+                "accuracy": round(acc, 3),
+                "f1_tipo": "macro",
+            }
 
         baseline_metrics = compute_metrics(actuals, baseline_preds)
 
-        # 2. System One Mock / Decision Model: Evaluates semantic discrepancy via detect_contradictions logic
-        # In offline/mock mode, MockDecisionAdapter / detect_contradictions accurately matches semantic discrepancies
-        system_one_preds = []
-        for a, b, _ in eval_pairs:
-            is_discrepancy = regex_baseline_discrepancy(a, b)
-            # Semantic adjustment: handles contextual compatibility
-            if "acp" in a.lower() and "45 pies" in b.lower():
-                is_discrepancy = False
-            system_one_preds.append(is_discrepancy)
-
-        system_one_metrics = compute_metrics(actuals, system_one_preds)
+        # Query the configured adapter, rather than decorating regex outputs as model predictions.
+        model_predictions = [
+            bool((await self.service.detect_contradictions(text_a, text_b))["discrepancia_detectada"])
+            for text_a, text_b, _ in eval_pairs
+        ]
+        model_metrics = compute_metrics(actuals, model_predictions)
 
         return {
             "tarea": "Detección de Contradicciones Fácticas (T05)",
@@ -162,9 +189,12 @@ class BaselineEvaluator:
                 **baseline_metrics,
                 "limitacion": "Produce falsos positivos cuando dos fuentes citan diferentes métricas válidas del mismo evento.",
             },
-            "system_one_ia": {
-                **system_one_metrics,
-                "ventaja_ia": "Analiza compatibilidad contextual tipada sin sesgo numérico superficial.",
+            "modelo_decision": {
+                **model_metrics,
+                "provider": self.service.decision_client.provider_name,
+                "model": self.service.decision_client.model_name,
+                "muestra": len(eval_pairs),
+                "limitacion": "Diez pares sintéticos; no constituye validación editorial independiente.",
             },
         }
 
@@ -174,6 +204,13 @@ class BaselineEvaluator:
         only_dev: bool = True,
     ) -> Dict[str, Any]:
         """Runs the 60 benchmark queries, measuring citation coverage, abstention, and latency."""
+        if not only_dev:
+            return {
+                "error": (
+                    "La ejecución completa está deshabilitada: las respuestas reservadas están dentro del repositorio "
+                    "y requieren custodia externa para constituir una evaluación ciega."
+                )
+            }
         path = benchmark_path or (self.settings.DATA_DIR / "benchmark.jsonl")
         if not path.exists():
             return {"error": f"Archivo de benchmark no encontrado en {path}"}
@@ -185,10 +222,8 @@ class BaselineEvaluator:
                 if line:
                     queries.append(json.loads(line))
 
-        if only_dev:
-            eval_queries = [q for q in queries if q.get("conjunto") == "desarrollo"]
-        else:
-            eval_queries = queries
+        eval_queries = [q for q in queries if q.get("conjunto") == "desarrollo"]
+        evaluation_service = self._offline_evaluation_service()
 
         latencies_ms: List[float] = []
         citas_validas_count = 0
@@ -205,7 +240,7 @@ class BaselineEvaluator:
             consulta = q.get("consulta", "")
 
             start_t = time.perf_counter()
-            resp = await self.service.answer_query_async(consulta)
+            resp = await evaluation_service.answer_query_async(consulta)
             duration_ms = (time.perf_counter() - start_t) * 1000.0
             latencies_ms.append(duration_ms)
 
@@ -247,12 +282,12 @@ class BaselineEvaluator:
         tasa_seguridad = (inyecciones_neutralizadas / max(1, inyecciones_totales)) * 100.0
 
         ranking_baseline = self.evaluate_ranking_baseline()
-        classification_baseline = self.evaluate_classification_and_contradictions_baseline()
+        classification_baseline = await self.evaluate_classification_and_contradictions_baseline()
 
         return {
             "resumen_benchmark": {
                 "total_consultas_ejecutadas": len(eval_queries),
-                "modo_evaluacion": "desarrollo (40)" if only_dev else "completo (60)",
+                "modo_evaluacion": "desarrollo (40); reservado no ejecutado",
                 "cobertura_citas_porcentaje": round(cobertura_citas, 1),
                 "meta_cobertura_citas": "100.0%",
                 "tasa_abstencion_porcentaje": round(tasa_abstencion, 1),

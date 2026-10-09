@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         metricInjection: document.getElementById('metric-injection'),
         metricP5Gain: document.getElementById('metric-p5-gain'),
         metricF1: document.getElementById('metric-f1'),
+        metricF1Target: document.getElementById('metric-f1-target'),
         metricLatency: document.getElementById('metric-latency'),
 
         // Modal
@@ -663,11 +664,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const baselineP5 = ranking.baseline_recencia?.precision_at_5;
         const copilotP5 = ranking.copilot_score_p?.precision_at_5;
         if (Number.isFinite(baselineP5) && Number.isFinite(copilotP5)) {
-            const relativeGain = baselineP5 > 0 ? ((copilotP5 - baselineP5) / baselineP5) * 100 : 0;
-            elements.metricP5Gain.textContent = `${relativeGain >= 0 ? '+' : ''}${relativeGain.toFixed(1)}%`;
+            if (baselineP5 === 0) {
+                elements.metricP5Gain.textContent = 'N/D';
+            } else {
+                const relativeGain = ((copilotP5 - baselineP5) / baselineP5) * 100;
+                elements.metricP5Gain.textContent = `${relativeGain >= 0 ? '+' : ''}${relativeGain.toFixed(1)}%`;
+            }
         }
-        if (Number.isFinite(contradictions.system_one_ia?.f1)) {
-            elements.metricF1.textContent = contradictions.system_one_ia.f1.toFixed(3);
+        if (Number.isFinite(contradictions.modelo_decision?.f1)) {
+            const model = contradictions.modelo_decision;
+            elements.metricF1.textContent = model.f1.toFixed(3);
+            elements.metricF1Target.textContent = `${model.provider}/${model.model}; muestra de ${model.muestra} pares sintéticos`;
         }
         if (Number.isFinite(summary.latencia_mediana_ms)) {
             elements.metricLatency.textContent = `${summary.latencia_mediana_ms.toFixed(1)} ms`;

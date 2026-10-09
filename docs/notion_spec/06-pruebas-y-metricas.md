@@ -35,19 +35,18 @@ Para evaluar de forma cuantitativa y reproducible el desempeño del copiloto fre
   - 10 consultas con hechos faltantes (para evaluar abstención estricta).
   - 10 consultas con intentos adversariales de inyección de prompt y fuga de instrucciones.
 
-### 2.1. Resultados locales exploratorios (2026-10-08)
+### 2.1. Resultados locales exploratorios (2026-10-09)
 
 El archivo contiene 60 consultas: 40 desarrollo y 20 reservadas. El endpoint ejecuta desarrollo. El conjunto reservado está dentro del repositorio, por lo que no es ciego ni constituye evaluación externa.
 
 ```
-P@5: recencia 0.200 (1/5); fórmula P 0.400 (2/5).
+En ejecución offline del 2026-10-09 sobre el snapshot SQLite sellado: P@5 recencia 0.000 (0/5) y fórmula P 0.400 (2/5). No se calcula mejora relativa porque la precisión baseline es cero.
 La relevancia se infiere con palabras clave; no equivale a una selección independiente de editor.
 
-Contradicciones: diez pares sintéticos. F1 de clase positiva 0.833 para regex y 0.833 para regla mock.
-No es macro-F1 y no evalúa System One.
+Contradicciones: diez pares sintéticos comparados entre regex y el adaptador de decisión configurado. En modo `mock`, Macro-F1 fue 0.792 para regex y 0.524 para el mock (`mock-clef-offline`). No representa desempeño de un modelo remoto ni una muestra editorial independiente.
 
 Citas/abstención: el evaluador cuenta IDs o marcadores; no valida soporte semántico.
-Latencia: 0.7 ms de mediana en modo offline determinista; no representa un proveedor real.
+Latencia: 2.1 ms de mediana en esta ejecución offline determinista; no representa un proveedor real.
 ```
 
 ---
@@ -56,8 +55,8 @@ Latencia: 0.7 ms de mediana en modo offline determinista; no representa un prove
 
 | Componente del Sistema | Baseline Clásico | Solución Copiloto IA (Sentria) | Impacto / Ganancia |
 | :--- | :--- | :--- | :--- |
-| **Ranking de Agenda (CU-01)** | Recencia sobre cinco casos. | Fórmula de atención sobre el mismo corpus. | Resultado exploratorio: 1/5 frente a 2/5; relevancia por keywords, no etiqueta editorial. |
-| **Contradicciones** | Regla regex. | Regla mock derivada de la misma regla. | F1 positivo 0.833 en ambos sobre diez pares sintéticos; no mide System One. |
+| **Ranking de Agenda (CU-01)** | Recencia sobre los mismos cinco casos. | Fórmula de atención sobre el mismo corpus. | Resultado exploratorio: 0/5 frente a 2/5; relevancia por keywords, no etiqueta editorial; mejora relativa no definida con baseline cero. |
+| **Contradicciones** | Regla regex sobre números y verbos de negación. | Predicciones consultando el adaptador de decisión configurado. | En modo mock, Macro-F1 0.792 frente a 0.524; diez pares sintéticos, no representa evaluación editorial independiente. |
 | **Citas y abstención** | No hay baseline. | Recuento de IDs y marcadores de salida. | No mide soporte semántico ni demuestra ausencia de alucinaciones. |
 
 ---
@@ -70,9 +69,9 @@ Para reproducir la totalidad de las pruebas y métricas desde el entorno de term
 # Ejecutar los 10 tests de aceptación mandatorios
 uv run pytest tests/test_acceptance_t01_t10.py -v
 
-# Ejecutar el benchmark formal de 60 consultas
+# Ejecutar el benchmark de desarrollo (40 consultas); no ejecuta las 20 etiquetas reservadas expuestas
 make benchmark
 
-# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 80 Tests de Pytest)
+# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 133 Tests de Pytest)
 make check
 ```

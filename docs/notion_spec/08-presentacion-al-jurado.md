@@ -63,7 +63,7 @@
 
 ### Minuto 6:30 – 8:00: Validación Científica y Resultados del Benchmark
 *(Hacer clic en la pestaña 'Métricas & Benchmark')*
-> *"Tenemos un conjunto de 60 consultas con 40 de desarrollo y 20 reservadas; el conjunto reservado todavía requiere custodia independiente. En una medición exploratoria de cinco casos, la fórmula obtuvo 2 de 5 relevantes frente a 1 de 5 por recencia, con etiquetas por palabras clave. La prueba de contradicciones usa diez pares sintéticos y una regla mock: no muestra mejora frente a regex. Las tasas de citas cuentan IDs, no validan por sí solas que cada pasaje respalde una afirmación. Estamos cerrando esa evaluación antes de presentar resultados como desempeño de un modelo."*
+> *"Tenemos 40 consultas de desarrollo ejecutables. Las 20 etiquetas reservadas quedaron dentro del repositorio y no son ciegas, así que el runner las excluye y necesitamos custodia independiente para evaluar al jurado. En el snapshot SQLite local, P@5 fue 0 de 5 por recencia y 2 de 5 con la fórmula; son etiquetas por palabras clave, no una selección editorial independiente. En diez pares sintéticos, Macro-F1 fue 0.792 para regex y 0.524 para el adaptador mock. Las tasas estructurales de citas no verifican por sí solas el sustento semántico de cada oración."*
 
 ---
 

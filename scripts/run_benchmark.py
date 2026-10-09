@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runner script to execute the 60 benchmark queries and comparative AI baselines."""
+"""Runner for the development benchmark and its explicitly scoped comparisons."""
 
 import asyncio
 import json
@@ -20,8 +20,11 @@ async def main() -> None:
     service = CopilotService(settings=settings)
     evaluator = BaselineEvaluator(service=service, settings=settings)
 
-    print("\n[1/3] Ejecutando suite de benchmark sobre data/benchmark.jsonl...")
-    results = await evaluator.run_benchmark_suite(only_dev=False)
+    print("\n[1/3] Ejecutando únicamente las consultas de desarrollo (40)...")
+    results = await evaluator.run_benchmark_suite(only_dev=True)
+
+    if "error" in results:
+        raise RuntimeError(results["error"])
 
     summary = results["resumen_benchmark"]
     baselines = results["comparativa_baselines"]
@@ -47,15 +50,21 @@ async def main() -> None:
     print(f"  [Tarea A] {rank['tarea']} ({rank['metrica']}):")
     print(f"    - Baseline (Recencia por fecha):  {rank['baseline_recencia']['precision_at_5']}")
     print(f"    - Copilot (Atención P):           {rank['copilot_score_p']['precision_at_5']}")
-    print(f"    - Mejora relativa observada:      +{rank['mejora_relativa_porcentaje']}%")
+    relative_gain = rank["mejora_relativa_porcentaje"]
+    if relative_gain is None:
+        print("    - Mejora relativa observada:      No calculable (baseline P@5 = 0)")
+    else:
+        print(f"    - Mejora relativa observada:      {relative_gain:+.1f}%")
 
     cla = baselines["clasificacion_contradicciones"]
     print(f"\n  [Tarea B] {cla['tarea']} ({cla['metrica']}):")
     print(
         f"    - Baseline (Regex/Palabras clave): F1={cla['baseline_regex']['f1']} | Prec={cla['baseline_regex']['precision']} | Rec={cla['baseline_regex']['recall']}"
     )
+    model = cla["modelo_decision"]
     print(
-        f"    - System One (Modelo de decisión): F1={cla['system_one_ia']['f1']} | Prec={cla['system_one_ia']['precision']} | Rec={cla['system_one_ia']['recall']}"
+        f"    - Adaptador configurado ({model['provider']}/{model['model']}): "
+        f"Macro-F1={model['f1']} | Prec={model['precision']} | Rec={model['recall']}"
     )
 
     # Save to data/benchmark_results.json

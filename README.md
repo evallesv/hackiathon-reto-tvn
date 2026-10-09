@@ -36,14 +36,14 @@ La solución combina un corpus público congelado (para evaluación reproducible
 5. **Dashboard Web Interactivo Dark Glassmorphism**:
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
-   - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
+   - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas exploratorias de desarrollo y verificador de integridad SHA-256.
    - La agenda y las consultas usan primero noticias recientes persistidas en SQLite (ventana retrospectiva configurable `LIVE_AGENDA_MAX_AGE_DAYS`, 90 días por defecto), además de conservar el snapshot para preguntas históricas. Indicadores y eventos vivos se combinan por sus claves con las series congeladas. Si no hay noticia reciente, la agenda identifica claramente el respaldo histórico; el entorno de pruebas sigue usando solo el snapshot.
    - `data/snapshot/snapshot.sqlite` empaqueta el corpus congelado y, cuando existe, noticias recientes, indicadores y eventos de la base local. La copia se abre en modo de solo lectura, incluye su manifiesto/hash y excluye revisiones editoriales y bitácoras de ingesta. `make sqlite-snapshot` la genera sin modificar `data/raw/` ni `data/manifest.json`.
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
    - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
-   - La medición local exploratoria obtuvo P@5 de **0.20 (1/5)** por recencia y **0.40 (2/5)** con la fórmula de atención. Las etiquetas se basan en palabras clave y no son una evaluación editorial independiente.
-   - La evaluación de contradicciones usa una regla mock y diez pares sintéticos: ambos métodos obtuvieron F1 de clase positiva **0.833**. No es macro-F1 ni mide el desempeño de un modelo real.
+   - En ejecución local offline del 2026-10-09 sobre el snapshot SQLite sellado, la recencia obtuvo P@5 **0.00 (0/5)** y la fórmula P **0.40 (2/5)**. Las etiquetas se basan en palabras clave y no son una evaluación editorial independiente; la mejora relativa queda como no disponible con baseline cero.
+   - La evaluación de contradicciones compara regex con diez pares sintéticos procesados por el adaptador de decisión configurado (`mock`, Cloudflare o Jev); informa Macro-F1 y el proveedor/modelo usados. El modo `mock` es determinista y no representa desempeño de un modelo remoto. La evaluación reservada requiere custodia externa.
    - Las tasas de cita y abstención miden condiciones estructurales de respuestas seleccionadas; no verifican sustento semántico ni demuestran ausencia de alucinaciones.
 7. **Extensión Modular para Sector Banca (CU-05)**:
    - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
@@ -194,7 +194,7 @@ Una vez iniciado el servidor, accede a la documentación interactiva y explorado
 * `POST /api/v1/copilot/generate-banking-draft` — Generación de **boletín bancario macroeconómico y logístico** (**CU-05**).
 * `POST /api/v1/copilot/contradictions` — Detección automatizada de discrepancias y afirmaciones incompatibles (**T05**).
 * `POST /api/v1/copilot/review` — Máquina de estados y persistencia en SQLite de la **revisión humana** (`en_revision`, `aprobado_como_borrador`, etc.).
-* `GET /api/v1/copilot/benchmark/metrics` — Métricas formales del benchmark de 60 consultas y comparativa frente a baselines.
+* `GET /api/v1/copilot/benchmark/metrics` — Métricas del conjunto de desarrollo (40 consultas) y comparativa exploratoria frente a baselines.
 * `GET /api/v1/copilot/manifest` — Consulta del manifiesto criptográfico SHA-256.
 * `GET /api/v1/ingestion/status` — Estadísticas de almacenamiento SQLite y auditoría de ingesta en vivo.
 * `POST /api/v1/ingestion/trigger` — Disparo manual de ciclo de ingesta en vivo.
@@ -205,7 +205,7 @@ Una vez iniciado el servidor, accede a la documentación interactiva y explorado
 # Iniciar el servidor local (Dashboard en http://localhost:8080/)
 uv run hackiathon-server
 
-# Ejecutar el benchmark formal de 60 consultas frente a baselines
+# Ejecutar el benchmark de desarrollo (40 consultas); el conjunto reservado queda deshabilitado
 make benchmark
 
 # Crear el paquete SQLite offline desde el corpus y la ingesta local disponible
@@ -299,6 +299,7 @@ Todas las decisiones técnicas se encuentran documentadas en [`docs/adr/`](docs/
 * [ADR-0012: Flujo Git para Desarrollo Multi-Agente, Estandarización en AGENTS.md y Protección de Main](docs/adr/0012-multi-agent-git-workflow-and-main-protection.md)
 * [ADR-0013: Ruteo Unificado OpenCode para Modelos de Decisión System One y Generativos System Two](docs/adr/0013-unified-opencode-routing-for-system-one-and-two.md)
 * [ADR-0014: Evaluación de Baselines y Benchmark Formal de 60 Consultas](docs/adr/0014-baseline-evaluation-and-60-query-benchmark.md)
+* [ADR-0024: Protección del benchmark reservado y reporte del adaptador real](docs/adr/0024-protect-reserved-benchmark-and-report-real-adapter.md)
 * [ADR-0015: Dashboard Web Interactivo Embebido para Demostración al Jurado](docs/adr/0015-embedded-glassmorphism-web-dashboard.md)
 * [ADR-0016: Reintentos y Publicación Atómica de Snapshots Candidatos](docs/adr/0016-resilient-snapshot-candidate-acquisition.md)
 
@@ -336,7 +337,7 @@ El espacio oficial de Notion Business contiene las **8 páginas obligatorias** d
 | **02** | **Plan y decisiones** | Backlog de 10 tareas, cronograma y 5 decisiones de arquitectura (ADRs). | [`02-plan-y-decisiones.md`](docs/notion_spec/02-plan-y-decisiones.md) |
 | **03** | **Catálogo de datos** | 4 fuentes, licencias (CC BY 4.0, TVN, USGS), nulos y hashes SHA-256. | [`03-catalogo-de-datos.md`](docs/notion_spec/03-catalogo-de-datos.md) |
 | **04** | **Diseño de solución** | Arquitectura Hexagonal, Pydantic, fórmula $P$, prompts seguros y límites. | [`04-diseno-de-solucion.md`](docs/notion_spec/04-diseno-de-solucion.md) |
-| **05** | **Casos y evidencias** | 5 fichas canónicas, citas 100%, brief TVN, banca y alerta Guardrail T08. | [`05-casos-y-evidencias.md`](docs/notion_spec/05-casos-y-evidencias.md) |
+| **05** | **Casos y evidencias** | 5 fichas canónicas; IDs y fragmentos pasan controles léxicos, con revisión humana para sustento semántico. | [`05-casos-y-evidencias.md`](docs/notion_spec/05-casos-y-evidencias.md) |
 | **06** | **Pruebas y métricas** | Matriz T01-T10 y benchmark en desarrollo; resultados exploratorios y límites documentados. | [`06-pruebas-y-metricas.md`](docs/notion_spec/06-pruebas-y-metricas.md) |
 | **07** | **Riesgos y ética** | Matriz de riesgos, derechos de autor, anti-inyección y reserva humana. | [`07-riesgos-y-etica.md`](docs/notion_spec/07-riesgos-y-etica.md) |
 | **08** | **Presentación al jurado** | Pitch cronometrado de 10 minutos, guión para el expositor y respuestas clave. | [`08-presentacion-al-jurado.md`](docs/notion_spec/08-presentacion-al-jurado.md) |
