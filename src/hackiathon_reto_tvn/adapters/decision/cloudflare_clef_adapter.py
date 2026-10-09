@@ -4,6 +4,7 @@ Implements System One decision model over Cloudflare Workers AI REST API.
 """
 
 import logging
+import math
 from collections.abc import Mapping
 from typing import Any, Dict, Union
 
@@ -69,12 +70,23 @@ class CloudflareClefAdapter(BaseDecisionClient):
             "Content-Type": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(self.endpoint_url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(self.endpoint_url, json=payload, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+            result = self._parse_response(data)
+            self._validate_requested_answers(result, questions)
+            return result
+        except Exception as exc:
+            logger.warning(
+                f"Error calling Cloudflare Clef API ({self.model}): {exc}. "
+                "Falling back to MockDecisionAdapter for resilient offline operation (T10)."
+            )
+            from hackiathon_reto_tvn.adapters.decision.mock_decision_adapter import MockDecisionAdapter
 
-        return self._parse_response(data)
+            fallback = MockDecisionAdapter(model_name=f"{self.model}-offline-fallback")
+            return await fallback.decide(state=state, questions=questions)
 
     def _serialize_questions(self, questions: Mapping[str, QuestionDefinition]) -> Dict[str, Any]:
         """Serializes questions into Cloudflare Clef / System One schema."""
@@ -107,6 +119,26 @@ class CloudflareClefAdapter(BaseDecisionClient):
                 serialized[q_id] = q_def.model_dump()
         return serialized
 
+    @staticmethod
+    def _validate_requested_answers(result: DecisionResult, questions: Mapping[str, QuestionDefinition]) -> None:
+        """Require a usable answer of the requested type before attributing provider success."""
+        for key, question in questions.items():
+            answer = result.answers.get(key)
+            valid_type = (
+                isinstance(question, NoulQuestion)
+                and isinstance(answer, NoulAnswer)
+                or isinstance(question, ChoiceQuestion)
+                and isinstance(answer, ChoiceAnswer)
+                or isinstance(question, ScoreQuestion)
+                and isinstance(answer, ScoreAnswer)
+            )
+            if not valid_type:
+                raise ValueError(f"Respuesta ausente o de tipo incompatible para la pregunta '{key}'.")
+            if isinstance(answer, ChoiceAnswer) and not answer.answer.strip():
+                raise ValueError(f"Respuesta de clasificación vacía para la pregunta '{key}'.")
+            if isinstance(answer, ScoreAnswer) and not math.isfinite(answer.expected_score):
+                raise ValueError(f"Puntaje no finito para la pregunta '{key}'.")
+
     def _parse_response(self, data: Dict[str, Any]) -> DecisionResult:
         """Parses Cloudflare response envelope result.answers."""
         result_body = data.get("result", {})
@@ -123,7 +155,9 @@ class CloudflareClefAdapter(BaseDecisionClient):
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},
                 )
             elif "confidence" in ans_data or ("probabilities" in ans_data and "probability" not in ans_data):
-                raw_ans = str(ans_data.get("answer", ""))
+                raw_ans = ans_data.get("answer")
+                if not isinstance(raw_ans, str):
+                    raise ValueError(f"Respuesta de clasificación inválida para '{key}'.")
                 parsed_answers[key] = ChoiceAnswer(
                     answer=raw_ans,
                     probabilities={k: float(v) for k, v in ans_data.get("probabilities", {}).items()},

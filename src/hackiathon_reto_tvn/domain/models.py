@@ -5,7 +5,7 @@ for HackIAthon 'De la señal a la decisión'.
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -61,9 +61,9 @@ class Noticia(BaseModel):
 class Indicador(BaseModel):
     """Contrato de datos para indicadores.csv (Banco Mundial / SBP)."""
 
-    pais_iso3: str
-    indicador_id: str
-    anio: int
+    pais_iso3: Optional[str]
+    indicador_id: Optional[str]
+    anio: Optional[int]
     valor: Optional[float] = None
     unidad: str
     fuente_url: str
@@ -168,6 +168,8 @@ class FichaCaso(BaseModel):
     persona_revisora: Optional[str] = None
     fecha_creacion: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     observaciones_revision: Optional[str] = None
+    origen_datos: Literal["ingesta_viva", "snapshot_congelado"] = "snapshot_congelado"
+    fecha_actualizacion_fuente: Optional[str] = None
 
 
 class ManifestItem(BaseModel):
@@ -185,3 +187,15 @@ class Manifest(BaseModel):
     cantidad_por_archivo: dict[str, int]
     licencia_condiciones: str
     archivos: list[ManifestItem]
+
+
+class QueryRequest(BaseModel):
+    consulta: str = Field(..., description="Pregunta del usuario o jurado")
+    modalidad: str = "tvn_editorial"
+
+
+class QueryResponse(BaseModel):
+    consulta: str
+    respuesta: str
+    es_abstencion: bool
+    citas: list[dict[str, Any]] = Field(default_factory=list)

@@ -1,30 +1,27 @@
-# ADR-0007: Estructura de Documentación y Registro en Notion Business
+# ADR-0007: Preparación local y registro obligatorio en Notion Business
 
-* **Estado**: Aceptado
-* **Fecha**: 2026-10-06
+* **Estado**: Aceptado; publicación y verificación de acceso en Notion pendientes
+* **Fecha inicial**: 2026-10-06
+* **Revisión**: 2026-10-09
 * **Decisores**: Equipo de Ingeniería de IA
 
 ## Contexto
 
-La sección 5 del documento del reto declara a **Notion Business como requisito indispensable y superficie oficial de presentación**.
-La estructura obligatoria por equipo exige las siguientes 8 páginas o bases de datos:
-1. **Inicio del reto**: Equipo, modalidad, problema, usuario, alcance, criterios de éxito y accesos a demo y repositorio.
-2. **Plan y decisiones**: Backlog, responsables, estados, cronología y decisiones técnicas o de producto (al menos 8 tareas y 3 decisiones justificadas).
-3. **Catálogo de datos**: Fuente, URL, fecha de extracción, cobertura, campos, licencia/condiciones, transformaciones y hash del snapshot.
-4. **Diseño de solución**: Arquitectura, modelo de datos, reglas, modelos, prompts, versiones y límites del sistema.
-5. **Casos y evidencias**: Fichas con IDs, fuentes, puntaje desglosado, estado de evidencia, borrador y persona revisora (mínimo 5 fichas trazables, incluyendo 1 caso sin evidencia suficiente).
-6. **Pruebas y métricas**: Matriz con los 10 casos de prueba de la sección 9 (T01–T10) y métricas de la ejecución final.
-7. **Riesgos y ética**: Privacidad, derechos, sesgos, ataques al agente, controles y escenarios fuera de alcance.
-8. **Presentación al jurado**: Flujo de pitch de 10 minutos navegable desde Notion.
+La sección 5 del documento del reto exige Notion Business como registro de ejecución y superficie oficial de presentación. Para ser admitida, la entrega necesita una URL accesible al jurado, al menos ocho tareas y tres decisiones justificadas, un catálogo completo, cinco fichas trazables con un caso de evidencia insuficiente, pruebas T01–T10 con métricas finales y un pitch de diez minutos desde Notion.
+
+La organización debe confirmar puestos o invitados, permisos y acceso del jurado. La licencia no presupone cuentas ilimitadas ni cubre servicios externos de IA. No se exige Notion AI ni automatizar la carga. Un repositorio, PDF o PowerPoint no reemplaza el espacio.
 
 ## Decisión
 
-1. Mantener un espejo en Markdown en el repositorio (en `docs/notion_spec/`) con los esquemas de las 8 bases para que puedan exportarse o sincronizarse a Notion vía API o carga por lote.
-2. Formato de exportación interoperable en JSON (`fichas.jsonl` y `manifest.json`) que mapea exactamente con las columnas y propiedades requeridas en las bases de datos de Notion.
-3. El código del copiloto incluye endpoints y métodos de exportación para formatear las fichas con Markdown enriquecido apto para bloques de Notion.
+1. Mantener `docs/notion_spec/` como contenido local versionado para preparar las ocho páginas: Inicio del reto, Plan y decisiones, Catálogo de datos, Diseño de solución, Casos y evidencias, Pruebas y métricas, Riesgos y ética y Presentación al jurado.
+2. Permitir importar o copiar manualmente ese contenido. La exportación JSON de fichas sirve como insumo; requiere mapear campos a las páginas o bases de Notion. No se afirma que exista una sincronización automática ni una exportación de bloques de Notion implementada.
+3. Completar en Notion los responsables reales, fechas, decisiones, pruebas fallidas, correcciones y revisión humana durante la ejecución. Las fichas y nombres de fixtures ilustrativos no acreditan decisiones de personas reales.
+4. Compartir el espacio con participantes y jurado autorizados. Registrar su URL y comprobar permisos antes del cierre; no publicar secretos ni exigir acceso público en la web.
+5. Incorporar resultados de la última ejecución de `make check`, benchmark, entorno, proveedor efectivo y limitaciones. Distinguir corpus de evaluación y snapshot de demostración mediante sus manifiestos.
+6. Presentar desde Notion el pitch y el recorrido del prototipo mediante enlaces o embeds. Guardar evidencia del ensayo offline y de acceso al repositorio.
 
 ## Consecuencias
 
-### Positivas
-* Asegura el cumplimiento previo de habilitación ante el jurado.
-* Elimina discrepancias entre el código del repositorio y lo exhibido en la presentación final.
+El espejo local facilita revisión, reproducibilidad y preparación de una carga manual. **No asegura la habilitación del equipo ni prueba que Notion se haya utilizado durante el evento.** La publicación, los permisos, la documentación de ejecución y el pitch deben comprobarse en el espacio real.
+
+La integración automatizada es opcional y puede incorporarse después si existe acceso autorizado. Hasta entonces, el estado del entregable es «contenido local preparado; publicación y acceso en Notion pendientes».

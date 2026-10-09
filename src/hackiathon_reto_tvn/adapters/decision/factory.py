@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 def get_decision_client(settings: Optional[Settings] = None) -> BaseDecisionClient:
     """Factory creating the configured decision model client.
 
-    Default: Cloudflare Clef (@cf/cloudflare/clef)
-    Alternative: TypeSafe Jev
+    Default: TypeSafe Jev (jev-1.13-free)
+    Alternative: Cloudflare Clef (@cf/cloudflare/clef)
     Offline / testing: MockDecisionAdapter
 
     Implements transparent fallback to Mock if provider credentials are not yet configured.

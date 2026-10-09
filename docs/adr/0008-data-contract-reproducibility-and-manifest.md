@@ -34,3 +34,7 @@ Reglas de integridad esenciales:
 ## Addendum (2026-10-06): nombre del campo de fecha de corte
 
 El campo del manifiesto que contiene la fecha de corte UTC se llama `fecha_corte_utc` (antes `fecha_corte_UTC`), según la convención `snake_case` en minúsculas definida en [ADR-0009](0009-snake-case-naming-convention-for-data-contracts.md). El cambio afecta al modelo `Manifest`, a `generate_manifest`, a `data/manifest.json` y a la respuesta de `GET /api/v1/copilot/manifest`. Los hashes SHA-256 de `data/raw/` no cambian.
+
+## Addendum (2026-10-09): GDELT `seendate`
+
+GDELT `seendate` es el momento en que el servicio detectó el artículo, no la fecha original de publicación. El adaptador lo conserva en `fecha_deteccion` y deja `fecha_publicacion` vacía si no puede verificarla por separado.

@@ -9,7 +9,7 @@
 
 ## 1. Project Overview
 
-This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation. Additionally, it integrates a persistent SQLite storage layer on Fly.io volumes (`copilot.db` in WAL mode) for periodic live ingestion from RSS, GDELT, World Bank, and USGS, strictly decoupled from the frozen benchmark dataset to maintain 100% deterministic reproducibility.
+This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation. A read-only SQLite snapshot (`data/snapshot/snapshot.sqlite`) packages that corpus for offline local queries; a separate persistent SQLite database on Fly.io volumes (`copilot.db` in WAL mode) supports periodic live ingestion and editorial review.
 
 **Core Architectural Pattern**: Clean Architecture / Hexagonal (Ports & Adapters). Domain rules have zero dependencies on frameworks, network I/O, or specific LLM providers.
 
@@ -230,12 +230,13 @@ hackiathon-reto-tvn/
 │   │   │   ├── mock_decision_adapter.py   # Deterministic offline provider (T10 & CI)
 │   │   │   └── factory.py                 # Provider factory (get_decision_client)
 │   │   ├── llm/              # System Two text generation
-│   │   │   ├── opencode_adapter.py        # Default provider: muse-spark-1.3-contributor-free
+│   │   │   ├── opencode_adapter.py        # Default provider: muse-spark-1.3-contributor
 │   │   │   ├── gemini_adapter.py          # Alternative provider: google-genai SDK
 │   │   │   ├── mock_adapter.py            # Deterministic offline provider (T10 & CI)
 │   │   │   └── factory.py                 # Provider factory (get_llm_client)
 │   │   └── data/
 │   │       ├── loaders.py        # Non-blocking CSV, GeoJSON & SHA-256 manifest (frozen data)
+│   │       ├── sqlite_snapshot.py # Read-only reproducible SQLite corpus package
 │   │       ├── live_fetchers.py  # Live RSS, GDELT, World Bank, USGS feed collectors
 │   │       └── sqlite_storage.py # SQLite WAL repository for persistent live feeds
 │   ├── services/             # ORCHESTRATION & USE CASES
@@ -246,6 +247,7 @@ hackiathon-reto-tvn/
 │   └── main.py               # ASGI application entrypoint with background lifespan
 ├── data/
 │   ├── raw/                  # Frozen raw datasets (noticias.csv, indicadores.csv, etc.)
+│   ├── snapshot/              # Read-only SQLite corpus package and hash manifest
 │   ├── storage/              # Local SQLite database (copilot.db) (ignored by git)
 │   ├── manifest.json         # Cryptographic SHA-256 manifest
 │   └── benchmark.jsonl       # 60 benchmark evaluation queries
@@ -295,8 +297,8 @@ The system segregates **System One** non-generative decision models from **Syste
 ### 7.1. System One Decision Models (`DECISION_PROVIDER`)
 | Provider Key | Adapter Class | Default Model | Configuration Keys |
 | :--- | :--- | :--- | :--- |
-| **`cloudflare`** *(Default)* | `CloudflareClefAdapter` | `@cf/cloudflare/clef` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DECISION_MODEL` |
-| **`jev`** *(Alternative)* | `JevAdapter` | `jev-latest` | `TYPESAFE_API_KEY`, `TYPESAFE_BASE_URL` |
+| **`cloudflare`** *(Alternative)* | `CloudflareClefAdapter` | `@cf/cloudflare/clef` | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_DECISION_MODEL` |
+| **`jev`** *(Default)* | `JevAdapter` | `jev-1.13-free` | `TYPESAFE_API_KEY` or `OPENCODE_API_KEY`, `TYPESAFE_BASE_URL` |
 | **`mock`** *(Deterministic/CI)* | `MockDecisionAdapter` | `mock-decision-offline` | None (Offline, deterministic) |
 
 * Concurrency limit controlled by `DECISION_CONCURRENCY_LIMIT` (default 5 concurrent requests) using `asyncio.Semaphore`.
@@ -305,7 +307,7 @@ The system segregates **System One** non-generative decision models from **Syste
 ### 7.2. System Two Generative LLMs (`LLM_PROVIDER`)
 | Provider Key | Adapter Class | Default Model | Configuration Keys |
 | :--- | :--- | :--- | :--- |
-| **`opencode`** *(Default)* | `OpenCodeAdapter` | `muse-spark-1.3-contributor-free` | `OPENCODE_API_KEY`, `OPENCODE_BASE_URL` |
+| **`opencode`** *(Default)* | `OpenCodeAdapter` | `muse-spark-1.3-contributor` | `OPENCODE_API_KEY`, `OPENCODE_BASE_URL` |
 | **`gemini`** *(Alternative)* | `GeminiAdapter` | `gemini-2.5-flash` | `GEMINI_API_KEY`, `GEMINI_MODEL` |
 | **`mock`** *(Deterministic/CI)* | `MockLLMAdapter` | `mock-muse-spark-offline` | None (Offline, deterministic) |
 
@@ -338,7 +340,7 @@ Before marking any task as done, submitting a PR, or creating a commit, execute 
 - [ ] `uv run ruff check .` returns zero errors.
 - [ ] `uv run ruff format --check .` returns zero reformatting requirements.
 - [ ] `uv run mypy src/` returns `Success: no issues found`.
-- [ ] `uv run pytest` passes 100% of tests (all 60 tests and T01–T10).
+- [ ] `uv run pytest` passes all tests including T01–T10; report the count from the actual run.
 - [ ] `git diff --stat -- data/` shows no changes (tests and features must not mutate the frozen dataset or `data/manifest.json`).
 - [ ] No hardcoded API keys or secrets exist in any file; `.env` was never modified or committed.
 - [ ] New behaviour has a test; a bug fix has a regression test that fails without the fix.
@@ -356,24 +358,31 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | :--- | :--- | :--- |
 | **T05 (conflicts)** | Contradiction detector implemented via BaseDecisionClient in CopilotService.detect_contradictions. | `services/copilot_service.py`, `tests/test_acceptance_t01_t10.py` |
 | **Scoring inputs** | Evaluated via System One decision models (Clef/Jev) with fallback to regex heuristics. | `services/copilot_service.py::prioritize_agenda_async` |
-| **Draft limits** | 250/80 words and 45–60 s script are config values only; nothing validates a generated draft against them. | `config.py`, `BorradorEditorial` |
-| **Draft trust boundary** | `POST /generate-draft` accepts a client-supplied `FichaCaso` (including `estado_evidencia`), so a client can self-declare sufficient evidence. Resolve the case server-side by `id_caso`. | `api/routes.py` |
-| **Review persistence** | `POST /review` recomputes the agenda and mutates a transient object; nothing is persisted. | `api/routes.py`, `CopilotService.update_human_review` |
-| **API boundary** | `/manifest` does file I/O in the route; Boundary Rule 4 says routes only delegate. | `api/routes.py` |
-| **Event grouping** | Clusters by the first 3 title tokens longer than 3 chars: fragile for paraphrased headlines. | `EventGrouper.group_articles` |
-| **Indicator defaults** | Missing `anio`/`pais_iso3` columns are defaulted (`2024`/`PAN`) instead of preserved as null, which conflicts with T01/T04 intent. | `LocalStorageRepository.load_indicadores` |
+| **Draft limits** | RESOLVED: editorial packages enforce a 250-word brief, 80-word copy, and 113–150 spoken-word script using configurable 150 words/minute for 45–60 seconds; banking summaries enforce the 250-word limit. | `domain/editorial_constraints.py`, `services/copilot_service.py`, `tests/test_domain_invariants.py` |
+| **Draft trust boundary** | RESOLVED: `POST /generate-draft` and `POST /generate-banking-draft` accept only `caso_id`; the server derives evidence and score from the current corpus. | `api/routes.py`, `tests/test_api.py` |
+| **Review persistence** | RESOLVED: `POST /review` persists human reviews in SQLite (`fichas_casos`) and updates `FichaCaso` records with reviewer and notes. | `adapters/data/sqlite_storage.py`, `api/routes.py` |
+| **API boundary** | RESOLVED: `/manifest` delegates to the application service; the service reads the frozen manifest and returns 404 if absent without generating or mutating dataset files. | `api/routes.py`, `services/copilot_service.py`, `tests/test_api.py` |
+| **Event grouping** | RESOLVED: deterministic grouping now compares normalized meaningful title terms, requires at least two shared terms and 60% overlap of the shorter title, and limits date-aware matches to 14 days. It is still a lexical heuristic; paraphrases without shared terms need semantic evaluation before claiming reliable event resolution. | `EventGrouper.group_articles`, `tests/test_data_loaders.py` |
+| **Citation verification (T09)** | Strict mode validates structured `HECHO`/`DECLARACION` claims against known source IDs, quoted excerpts, and lexical terms. It does not extract every factual statement from free-text fields or prove semantic entailment. The benchmark separately measures only whether answerable responses cite resolvable corpus IDs. | `domain/safety.py`, `services/copilot_service.py`, `services/baseline_evaluator.py`, `tests/test_safety.py` |
+| **Query scope and draft guards** | Indicators require one explicit country and at most one year, with no country substitution. General news queries return corpus excerpts or abstain; raw LLM answers are not automatically cited. Drafts require factual claims and a server-derived headline-only label when applicable. Negation checks remain lexical and do not prove entailment. | ADR-0025, `tests/test_query_and_banking.py`, `tests/test_domain_invariants.py` |
+| **Benchmark isolation** | 40 development queries run against `data/raw/` verified by manifest; live SQLite and the augmented demo snapshot are disabled. The 20 checked-in jury labels are exposed and cannot be run as blind evaluation. A fresh jury file is accepted only from outside the repository and must contain only `reservado_jurado` rows. | `services/baseline_evaluator.py`, `scripts/run_benchmark.py`, `tests/test_benchmark_baseline.py` |
+| **Indicator identity fields** | RESOLVED: missing or malformed `pais_iso3`, `indicador_id` and `anio` values remain `None` through CSV loading and the SQLite snapshot. Evaluation audit counts rows without a complete identity as invalid rather than inventing keys. | `domain/models.py`, `adapters/data/loaders.py`, `adapters/data/sqlite_snapshot.py`, `services/snapshot_audit.py` |
+| **USGS partial records** | The shared `EventoGeoJSON` contract requires numeric values. Fetchers retain missing values as null; invalid historical/live records are excluded from query models with diagnostics. Snapshot packaging fails before publication if operational records are incompatible, rather than replacing null with zero. Real zeros remain unchanged. Supporting partial event models requires an explicit contract change. | `tests/test_data_loaders.py`, `tests/test_sqlite_snapshot.py`, `tests/test_live_agenda.py` |
 | **Naming deviation** | `EventoGeoJSON` uses English field names (`magnitude`, `time`, `place`, ...) mirroring the USGS schema; they are snake_case but not Spanish (ADR-0009). | `domain/models.py` |
 | **Mock provider** | Returns a fixed draft but cites the first `<source_data id=...>` found in the prompt, so strict citation checks work offline. | `adapters/llm/mock_adapter.py` |
+| **Incomplete decisions** | Cloudflare/Jev validate that every requested question has an answer of the required type; incompatible payloads use a mock fallback. The contradiction service rejects a missing or mistyped `NoulAnswer` instead of declaring consistency. Actual numeric zero remains valid. | `tests/test_decision_adapters.py`, ADR-0026 |
+| **Quarantined agenda evidence** | A cluster whose titles all trigger the injection detector has zero usable evidence, empty claims and `INSUFICIENTE` state. Source IDs and excerpts remain available for inspection; high decision scores cannot enable a draft. This is a pattern-based guard, not a universal detector or truth verdict. | `tests/test_domain_invariants.py`, ADR-0027 |
 
 ### Operational gotchas
 - **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.
 - **`data/manifest.json` is frozen.** Only the deliberate command `make manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
 - **Persistent Live Storage vs Frozen Dataset**: Live data ingestion stores real-time feeds in SQLite (`copilot.db`), leaving `data/raw/` and `data/manifest.json` completely untouched. Local development uses `data/storage/` (gitignored).
+- **SQLite Snapshot vs Operational Database**: `data/snapshot/snapshot.sqlite` is a read-only corpus package without editorial review or ingestion-run tables. `data/storage/copilot.db` is mutable operational state. Build the package with `make sqlite-snapshot`; the tool validates the raw manifest and leaves frozen source files unchanged.
 - **Offline test isolation for live ingestion**: `INGESTION_ENABLED="false"` is forced via autouse fixture in `tests/conftest.py` so scheduler and fetchers never trigger network requests in test suites (**T10**).
 - **SQLite Concurrency & WAL mode**: The SQLite adapter enforces `PRAGMA journal_mode=WAL;` and `PRAGMA busy_timeout=5000;` to ensure non-blocking concurrent operations between FastAPI requests and background ingestion.
 - **Fly.io Volume Mount**: On Fly.io, persistent volume `sentria_data` mounts to `/data`, configuring `SQLITE_DB_PATH=/data/copilot.db`.
 - **Recirculation (T03)** compares calendar dates with a threshold (`EventGrouper.RECIRCULATION_THRESHOLD_DAYS`), never raw timestamp strings.
-- **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, a draft with <100% citation coverage raises `ValueError` (HTTP 400).
+- **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, structured factual claims that fail the ID, excerpt, or lexical checks are rejected (`ValueError`, HTTP 400); this does not establish semantic entailment or complete coverage of free-text claims.
 - **Sandboxed shells** may fail git with `unable to access ~/.gitconfig`; prefix with `GIT_CONFIG_GLOBAL=/dev/null` for read-only git commands.
 
 ---

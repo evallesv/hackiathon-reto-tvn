@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 
 
@@ -123,3 +125,53 @@ def test_sqlite_storage_upsert_indicadores_and_eventos(tmp_path: Path) -> None:
     runs = storage.get_latest_runs(limit=5)
     assert len(runs) == 1
     assert runs[0]["estado"] == "SUCCESS"
+
+
+def test_usgs_storage_preserves_real_zero_updated_timestamp(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "zero.db")
+    storage.init_db()
+    storage.upsert_eventos([{"id": "zero-update", "magnitude": 3.0, "place": "Panama", "time": 1, "updated": 0}])
+
+    assert storage.get_latest_eventos()[0]["updated"] == 0
+
+
+@pytest.mark.parametrize("field", ["magnitude", "time", "place"])
+@pytest.mark.parametrize("explicit_null", [False, True])
+def test_usgs_storage_excludes_missing_required_data_and_continues_valid_records(
+    tmp_path: Path, field: str, explicit_null: bool
+) -> None:
+    storage = SQLiteStorage(tmp_path / "partial.db")
+    storage.init_db()
+    incomplete = {"id": "incomplete", "magnitude": 3.0, "place": "Panamá", "time": 1}
+    if explicit_null:
+        incomplete[field] = None
+    else:
+        incomplete.pop(field)
+    valid = {"id": "zero", "magnitude": 0.0, "place": "Panamá", "time": 0}
+
+    assert storage.upsert_eventos([incomplete, valid]) == 1
+    [stored] = storage.get_latest_eventos()
+    assert stored["id"] == "zero"
+    assert stored["magnitude"] == 0.0
+    assert stored["time"] == 0
+    assert stored["status"] is None
+
+
+def test_usgs_storage_synchronizes_corrected_coordinates_and_time(tmp_path: Path) -> None:
+    storage = SQLiteStorage(tmp_path / "corrected.db")
+    storage.init_db()
+    storage.upsert_eventos([{"id": "same", "magnitude": 3.0, "place": "Panamá", "time": 1}])
+    corrected = {
+        "id": "same",
+        "magnitude": 3.1,
+        "place": "Panamá",
+        "time": 2,
+        "latitud": 0.0,
+        "longitud": 0.0,
+        "profundidad": 0.0,
+        "url": "https://example.com/corrected",
+    }
+    storage.upsert_eventos([corrected])
+    [stored] = storage.get_latest_eventos()
+    assert (stored["time"], stored["latitud"], stored["longitud"], stored["profundidad"]) == (2, 0.0, 0.0, 0.0)
+    assert stored["url"] == corrected["url"]

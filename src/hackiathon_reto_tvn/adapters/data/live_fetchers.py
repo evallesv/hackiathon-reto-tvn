@@ -7,9 +7,11 @@ Provides real-time ingestion from the official sources specified in the hackatho
 4. USGS Earthquake Hazards Program GeoJSON API (Panama regional seismic box)
 """
 
+import asyncio
 import email.utils
 import hashlib
 import logging
+import random
 import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
@@ -25,9 +27,9 @@ USER_AGENT = "SentriaTVN-Copilot/1.0 (TVN Media HackIAthon Copilot; https://sent
 
 
 def _parse_rfc822_or_iso(date_str: str | None) -> str:
-    """Normalize RFC 822 or ISO date string to ISO 8601 UTC."""
+    """Normalize a supplied RFC 822 or ISO date; never invent a publication date."""
     if not date_str:
-        return datetime.now(timezone.utc).isoformat()
+        return ""
     try:
         parsed_tuple = email.utils.parsedate_to_datetime(date_str)
         return parsed_tuple.astimezone(timezone.utc).isoformat()
@@ -37,7 +39,7 @@ def _parse_rfc822_or_iso(date_str: str | None) -> str:
         dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
         return dt.astimezone(timezone.utc).isoformat()
     except Exception:
-        return datetime.now(timezone.utc).isoformat()
+        return ""
 
 
 def _generate_article_id(url: str) -> str:
@@ -49,8 +51,57 @@ def _generate_article_id(url: str) -> str:
 class LiveDataFetcher:
     """Orchestrates periodic retrieval of real data from public APIs."""
 
+    RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+    MAX_ATTEMPTS = 4
+
     def __init__(self, timeout_seconds: float = 25.0) -> None:
         self.timeout = timeout_seconds
+
+    async def _get_with_retries(self, client: httpx.AsyncClient, url: str) -> httpx.Response:
+        """Retry transient throttling, server, timeout, and transport failures."""
+        for attempt in range(self.MAX_ATTEMPTS):
+            try:
+                response = await client.get(url)
+                if response.status_code not in self.RETRYABLE_STATUSES:
+                    if response.status_code >= 400:
+                        raise RuntimeError(f"HTTP {response.status_code} from {urllib.parse.urlsplit(url).netloc}")
+                    return response
+                if attempt + 1 == self.MAX_ATTEMPTS:
+                    raise RuntimeError(
+                        f"HTTP {response.status_code} from {urllib.parse.urlsplit(url).netloc} "
+                        f"after {self.MAX_ATTEMPTS} attempts"
+                    )
+                retry_after = self._retry_after_seconds(response, 2**attempt + random.random() * 0.25)
+            except (httpx.TimeoutException, httpx.NetworkError, OSError) as exc:
+                if attempt + 1 == self.MAX_ATTEMPTS:
+                    raise RuntimeError(
+                        f"Request to {urllib.parse.urlsplit(url).netloc} failed after {self.MAX_ATTEMPTS} attempts: {exc}"
+                    ) from exc
+                retry_after = min(2**attempt + random.random() * 0.25, 8.0)
+
+            logger.info(
+                "Transient API response; retrying %s in %.2f seconds", urllib.parse.urlsplit(url).netloc, retry_after
+            )
+            await asyncio.sleep(retry_after)
+
+        raise RuntimeError("Request retry loop ended unexpectedly")
+
+    @staticmethod
+    def _retry_after_seconds(response: httpx.Response, fallback: float) -> float:
+        """Use Retry-After when valid, with a bounded exponential fallback."""
+        retry_after = response.headers.get("Retry-After", "").strip()
+        try:
+            return min(max(float(retry_after), 0.0), 60.0)
+        except ValueError:
+            if retry_after:
+                try:
+                    retry_at = email.utils.parsedate_to_datetime(retry_after)
+                    if retry_at.tzinfo is None:
+                        retry_at = retry_at.replace(tzinfo=timezone.utc)
+                    return min(max((retry_at - datetime.now(timezone.utc)).total_seconds(), 0.0), 60.0)
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        return min(max(fallback, 0.0), 8.0)
 
     async def fetch_tvn_rss(self, feed_url: str = "https://www.tvn-2.com/rss/") -> list[dict[str, Any]]:
         """Fetch and parse live RSS items from TVN Panama."""
@@ -60,8 +111,7 @@ class LiveDataFetcher:
             timeout=self.timeout,
             follow_redirects=True,
         ) as client:
-            resp = await client.get(feed_url)
-            resp.raise_for_status()
+            resp = await self._get_with_retries(client, feed_url)
             content = resp.text
 
         feed = feedparser.parse(content)
@@ -117,10 +167,24 @@ class LiveDataFetcher:
         self,
         query: str = "panama (logistica OR turismo OR economia)",
         max_records: int = 30,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch recent Panama news articles from GDELT DOC 2.0 API."""
+        if not 1 <= max_records <= 250:
+            raise ValueError("GDELT max_records must be between 1 and 250")
         encoded_query = urllib.parse.quote(query)
-        gdelt_url = f"https://api.gdeltproject.org/api/v2/doc/doc?query={encoded_query}&mode=artlist&maxrecords={max_records}&format=json"
+        date_params = ""
+        if start_datetime:
+            datetime.strptime(start_datetime, "%Y%m%d%H%M%S")
+            date_params += f"&startdatetime={start_datetime}"
+        if end_datetime:
+            datetime.strptime(end_datetime, "%Y%m%d%H%M%S")
+            date_params += f"&enddatetime={end_datetime}"
+        gdelt_url = (
+            f"https://api.gdeltproject.org/api/v2/doc/doc?query={encoded_query}"
+            f"&mode=artlist&maxrecords={max_records}&format=json{date_params}"
+        )
         logger.info(f"Fetching GDELT articles: {gdelt_url}")
 
         records: list[dict[str, Any]] = []
@@ -132,15 +196,11 @@ class LiveDataFetcher:
                 timeout=self.timeout,
                 follow_redirects=True,
             ) as client:
-                resp = await client.get(gdelt_url)
-                if resp.status_code != 200:
-                    logger.warning(f"GDELT returned HTTP {resp.status_code}")
-                    return []
+                resp = await self._get_with_retries(client, gdelt_url)
 
                 content_type = resp.headers.get("content-type", "")
                 if "json" not in content_type and not resp.text.strip().startswith("{"):
-                    logger.warning(f"GDELT returned non-JSON response (possibly rate limit warning): {resp.text[:120]}")
-                    return []
+                    raise RuntimeError(f"GDELT returned non-JSON response: {resp.text[:120]}")
 
                 data = resp.json()
                 articles = data.get("articles", [])
@@ -151,16 +211,18 @@ class LiveDataFetcher:
                     if not url or not title:
                         continue
 
-                    # Parse GDELT seendate format YYYYMMDDTHHMMSSZ
+                    # GDELT seendate is discovery time, not the article's publication time.
                     seen_date_raw = art.get("seendate")
                     if seen_date_raw:
                         try:
-                            dt = datetime.strptime(seen_date_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-                            iso_date = dt.isoformat()
+                            detected_at = datetime.strptime(seen_date_raw, "%Y%m%dT%H%M%SZ").replace(
+                                tzinfo=timezone.utc
+                            )
+                            detected_at_iso = detected_at.isoformat()
                         except ValueError:
-                            iso_date = now_utc
+                            detected_at_iso = now_utc
                     else:
-                        iso_date = now_utc
+                        detected_at_iso = now_utc
 
                     domain = art.get("domain", "GDELT Source")
                     records.append(
@@ -170,8 +232,8 @@ class LiveDataFetcher:
                             "url": url,
                             "medio": domain,
                             "idioma": art.get("language", "es"),
-                            "fecha_publicacion": iso_date,
-                            "fecha_deteccion": now_utc,
+                            "fecha_publicacion": "",
+                            "fecha_deteccion": detected_at_iso,
                             "fecha_extraccion": now_utc,
                             "tema": "economia_logistica",
                             "origen": "gdelt",
@@ -187,6 +249,7 @@ class LiveDataFetcher:
                 logger.info(f"Fetched {len(records)} live news items from GDELT")
         except Exception as exc:
             logger.warning(f"GDELT fetch encountered error: {exc}")
+            raise
 
         return records
 
@@ -194,6 +257,9 @@ class LiveDataFetcher:
         self,
         countries: list[str] | None = None,
         indicators: list[str] | None = None,
+        start_year: int = 2021,
+        end_year: int = 2024,
+        strict: bool = False,
     ) -> list[dict[str, Any]]:
         """Fetch macro indicators from the World Bank API."""
         target_countries = countries or ["PAN", "CRI", "COL", "DOM", "MEX", "GTM"]
@@ -206,45 +272,71 @@ class LiveDataFetcher:
 
         records: list[dict[str, Any]] = []
         now_utc = datetime.now(timezone.utc).isoformat()
+        semaphore = asyncio.Semaphore(3)
 
         async with httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT},
             timeout=self.timeout,
             follow_redirects=True,
         ) as client:
-            for country in target_countries:
-                for indicator in target_indicators:
-                    url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?date=2021:2024&format=json"
-                    try:
-                        resp = await client.get(url)
-                        if resp.status_code != 200:
-                            continue
-                        data = resp.json()
-                        if not isinstance(data, list) or len(data) < 2:
-                            continue
 
-                        entries = data[1]
-                        if not isinstance(entries, list):
-                            continue
+            async def fetch_indicator(country: str, indicator: str) -> list[dict[str, Any]]:
+                url = (
+                    f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
+                    f"?date={start_year}:{end_year}&format=json"
+                )
+                try:
+                    async with semaphore:
+                        resp = await self._get_with_retries(client, url)
+                    data = resp.json()
+                    if not isinstance(data, list) or len(data) < 2 or not isinstance(data[1], list):
+                        if strict:
+                            raise RuntimeError(f"Unexpected World Bank response for {country}/{indicator}")
+                        return []
 
-                        for item in entries:
-                            val = item.get("value")
-                            date_year = item.get("date")
-                            if date_year:
-                                records.append(
-                                    {
-                                        "pais_iso3": country,
-                                        "indicador_id": indicator,
-                                        "anio": int(date_year),
-                                        "valor": float(val) if val is not None else None,
-                                        "unidad": "%" if "ZG" in indicator or "ZS" in indicator else "unidad",
-                                        "fuente_url": url,
-                                        "fecha_extraccion": now_utc,
-                                        "licencia": "CC BY 4.0 (Banco Mundial)",
-                                    }
-                                )
-                    except Exception as exc:
-                        logger.warning(f"Error fetching WB {country}/{indicator}: {exc}")
+                    found: list[dict[str, Any]] = []
+                    for item in data[1]:
+                        val = item.get("value")
+                        date_year = item.get("date")
+                        if date_year:
+                            found.append(
+                                {
+                                    "pais_iso3": country,
+                                    "indicador_id": indicator,
+                                    "anio": int(date_year),
+                                    "valor": float(val) if val is not None else None,
+                                    "unidad": (
+                                        "personas"
+                                        if indicator == "SP.POP.TOTL"
+                                        else "%"
+                                        if "ZG" in indicator or "ZS" in indicator
+                                        else "unidad"
+                                    ),
+                                    "fuente_url": url,
+                                    "fecha_extraccion": now_utc,
+                                    "licencia": "CC BY 4.0 (Banco Mundial)",
+                                }
+                            )
+                    return found
+                except Exception as exc:
+                    logger.warning(f"Error fetching WB {country}/{indicator}: {exc}")
+                    if strict:
+                        raise RuntimeError(f"World Bank {country}/{indicator} failed: {exc}") from exc
+                    return []
+
+            batches = await asyncio.gather(
+                *(
+                    fetch_indicator(country, indicator)
+                    for country in target_countries
+                    for indicator in target_indicators
+                ),
+                return_exceptions=True,
+            )
+            failures = [batch for batch in batches if isinstance(batch, BaseException)]
+            if strict and failures:
+                details = "; ".join(str(failure) for failure in failures)
+                raise RuntimeError(f"World Bank responses incomplete ({len(failures)} failed): {details}")
+            records = [record for batch in batches if isinstance(batch, list) for record in batch]
 
         logger.info(f"Fetched {len(records)} indicators from World Bank API")
         return records
@@ -254,8 +346,12 @@ class LiveDataFetcher:
         min_magnitude: float = 3.0,
         bbox: tuple[float, float, float, float] = (5.0, 12.0, -86.0, -76.0),
         limit: int = 30,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch seismic events in the Panama region box from USGS GeoJSON API."""
+        if not 1 <= limit <= 20000:
+            raise ValueError("USGS limit must be between 1 and 20000")
         min_lat, max_lat, min_lon, max_lon = bbox
         url = (
             f"https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson"
@@ -264,6 +360,12 @@ class LiveDataFetcher:
             f"&minlongitude={min_lon}&maxlongitude={max_lon}"
             f"&limit={limit}"
         )
+        if start_time:
+            datetime.strptime(start_time, "%Y-%m-%d")
+            url += f"&starttime={start_time}"
+        if end_time:
+            datetime.strptime(end_time, "%Y-%m-%d")
+            url += f"&endtime={end_time}"
         logger.info(f"Fetching USGS seismic events: {url}")
 
         records: list[dict[str, Any]] = []
@@ -272,15 +374,16 @@ class LiveDataFetcher:
             timeout=self.timeout,
             follow_redirects=True,
         ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
+            resp = await self._get_with_retries(client, url)
             data = resp.json()
 
         features = data.get("features", [])
+        if len(features) >= limit:
+            raise RuntimeError(f"USGS result reached the requested limit ({limit}); results may be truncated")
         for feat in features:
             props = feat.get("properties", {})
             geom = feat.get("geometry", {})
-            coords = geom.get("coordinates", [0.0, 0.0, 0.0])
+            coords = geom.get("coordinates") or []
 
             lon = coords[0] if len(coords) > 0 else None
             lat = coords[1] if len(coords) > 1 else None
@@ -289,15 +392,15 @@ class LiveDataFetcher:
             records.append(
                 {
                     "id": feat.get("id") or props.get("code", ""),
-                    "magnitude": float(props.get("mag", 0.0)),
-                    "place": props.get("place", "Región Panamá"),
-                    "time": props.get("time", 0),
+                    "magnitude": float(props["mag"]) if props.get("mag") is not None else None,
+                    "place": props.get("place"),
+                    "time": props.get("time"),
                     "updated": props.get("updated"),
                     "url": props.get("url", ""),
                     "latitud": lat,
                     "longitud": lon,
                     "profundidad": depth,
-                    "status": props.get("status", "reviewed"),
+                    "status": props.get("status"),
                 }
             )
 

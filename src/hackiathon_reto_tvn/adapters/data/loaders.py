@@ -12,6 +12,8 @@ Handles:
 import hashlib
 import json
 import logging
+import re
+import unicodedata
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -38,6 +40,22 @@ def compute_sha256(filepath: Path) -> str:
         while chunk := f.read(65536):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def _optional_csv_str(value: Any) -> Optional[str]:
+    if pd.isna(value) or not str(value).strip() or str(value).strip().lower() == "nan":
+        return None
+    return str(value).strip()
+
+
+def _optional_csv_int(value: Any) -> Optional[int]:
+    if pd.isna(value) or not str(value).strip():
+        return None
+    try:
+        numeric_value = float(value)
+        return int(numeric_value) if numeric_value.is_integer() else None
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 class LocalStorageRepository(BaseStorageRepository):
@@ -111,9 +129,9 @@ class LocalStorageRepository(BaseStorageRepository):
                         valor_float = None
 
                 item = Indicador(
-                    pais_iso3=str(row.get("pais_iso3", "PAN")),
-                    indicador_id=str(row.get("indicador_id", "")),
-                    anio=int(row.get("anio", 2024)),
+                    pais_iso3=_optional_csv_str(row.get("pais_iso3")),
+                    indicador_id=_optional_csv_str(row.get("indicador_id")),
+                    anio=_optional_csv_int(row.get("anio")),
                     valor=valor_float,
                     unidad=str(row.get("unidad", "")),
                     fuente_url=str(row.get("fuente_url", "")),
@@ -127,7 +145,7 @@ class LocalStorageRepository(BaseStorageRepository):
         return indicadores
 
     def load_eventos(self, path: Path) -> List[EventoGeoJSON]:
-        """Loads USGS eventos.geojson."""
+        """Load complete USGS events; diagnose incomplete features without inventing numeric values."""
         if not path.exists():
             return []
 
@@ -137,27 +155,32 @@ class LocalStorageRepository(BaseStorageRepository):
         eventos: List[EventoGeoJSON] = []
         features = data.get("features", [])
 
-        for feat in features:
+        for index, feat in enumerate(features):
+            feature_id = feat.get("id", "sin id") if isinstance(feat, dict) else "sin id"
             try:
-                props = feat.get("properties", {})
-                geom = feat.get("geometry", {})
-                coords = geom.get("coordinates", [0.0, 0.0, 0.0])
+                props = feat.get("properties") or {}
+                geom = feat.get("geometry") or {}
+                coords = geom.get("coordinates")
+                if not isinstance(coords, list) or len(coords) < 3:
+                    raise ValueError("coordinates debe contener longitud, latitud y profundidad explícitas")
 
-                evento = EventoGeoJSON(
-                    id=str(feat.get("id", "")),
-                    magnitude=float(props.get("mag", 0.0)),
-                    time=int(props.get("time", 0)),
-                    updated=int(props.get("updated", 0)),
-                    longitude=float(coords[0]),
-                    latitude=float(coords[1]),
-                    depth=float(coords[2]) if len(coords) > 2 else 0.0,
-                    place=str(props.get("place", "")),
-                    status=str(props.get("status", "")),
-                    url=str(props.get("url", "")),
+                evento = EventoGeoJSON.model_validate(
+                    {
+                        "id": str(feat.get("id", "")),
+                        "magnitude": props.get("mag"),
+                        "time": props.get("time"),
+                        "updated": props.get("updated"),
+                        "longitude": coords[0],
+                        "latitude": coords[1],
+                        "depth": coords[2],
+                        "place": str(props.get("place", "")),
+                        "status": str(props.get("status", "")),
+                        "url": str(props.get("url", "")),
+                    }
                 )
                 eventos.append(evento)
             except Exception as exc:
-                logger.error(f"Error parsing feature in {path}: {exc}")
+                logger.error("Error parsing feature %s (%s) in %s: %s", index, feature_id, path, exc)
 
         return eventos
 
@@ -236,17 +259,91 @@ class EventGrouper:
     """Groups duplicate news articles into single events to avoid inflating corroboration (T02)."""
 
     RECIRCULATION_THRESHOLD_DAYS = 3
+    EVENT_MATCH_WINDOW_DAYS = 14
+    TITLE_STOP_WORDS = {
+        "al",
+        "ante",
+        "anuncia",
+        "anuncian",
+        "con",
+        "contra",
+        "de",
+        "del",
+        "durante",
+        "el",
+        "en",
+        "entre",
+        "esta",
+        "este",
+        "la",
+        "las",
+        "los",
+        "mientras",
+        "para",
+        "por",
+        "que",
+        "segun",
+        "sin",
+        "sobre",
+        "tras",
+        "un",
+        "una",
+        "y",
+        "gobierno",
+        "plan",
+    }
 
     @staticmethod
     def group_articles(articles: List[Noticia]) -> Dict[str, List[Noticia]]:
-        """Groups articles by normalized title tokens or key entity occurrences."""
+        """Group likely duplicate coverage by shared content terms within a recency window."""
+        parents = list(range(len(articles)))
+
+        def find(index: int) -> int:
+            while parents[index] != index:
+                parents[index] = parents[parents[index]]
+                index = parents[index]
+            return index
+
+        for left in range(len(articles)):
+            for right in range(left + 1, len(articles)):
+                if EventGrouper._same_event_candidate(articles[left], articles[right]):
+                    left_root, right_root = find(left), find(right)
+                    if left_root != right_root:
+                        parents[right_root] = left_root
+
         clusters: Dict[str, List[Noticia]] = {}
-        for art in articles:
-            # Simple normalized cluster key
-            tokens = [w.lower() for w in art.titulo.split() if len(w) > 3]
-            key = " ".join(tokens[:3]) if tokens else art.id_noticia
-            clusters.setdefault(key, []).append(art)
+        for index, article in enumerate(articles):
+            root = find(index)
+            key = f"evento_{articles[root].id_noticia}"
+            clusters.setdefault(key, []).append(article)
         return clusters
+
+    @staticmethod
+    def _normalized_title_tokens(title: str) -> set[str]:
+        normalized = unicodedata.normalize("NFKD", title.casefold())
+        ascii_text = "".join(char for char in normalized if not unicodedata.combining(char))
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", ascii_text)
+            if len(token) > 2 and token not in EventGrouper.TITLE_STOP_WORDS
+        }
+
+    @classmethod
+    def _same_event_candidate(cls, first: Noticia, second: Noticia) -> bool:
+        first_date = _parse_date(first.fecha_publicacion)
+        second_date = _parse_date(second.fecha_publicacion)
+        if first_date and second_date and abs((first_date - second_date).days) > cls.EVENT_MATCH_WINDOW_DAYS:
+            return False
+
+        first_tokens = cls._normalized_title_tokens(first.titulo)
+        second_tokens = cls._normalized_title_tokens(second.titulo)
+        shared_terms = first_tokens & second_tokens
+        smallest_title_term_count = min(len(first_tokens), len(second_tokens))
+        return (
+            smallest_title_term_count > 0
+            and len(shared_terms) >= 2
+            and len(shared_terms) / smallest_title_term_count >= 0.6
+        )
 
     @classmethod
     def detect_recirculated(cls, noticia: Noticia) -> Tuple[bool, str]:

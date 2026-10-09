@@ -7,10 +7,13 @@ from pydantic import BaseModel, Field
 
 from hackiathon_reto_tvn.config import Settings, get_settings
 from hackiathon_reto_tvn.domain.models import (
+    BorradorBancario,
     BorradorEditorial,
     EstadoRevision,
     FichaCaso,
     Manifest,
+    QueryRequest,
+    QueryResponse,
 )
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
@@ -40,16 +43,10 @@ class ContradictionRequest(BaseModel):
     texto_b: str = Field(..., description="Segunda versión o afirmación")
 
 
-class QueryRequest(BaseModel):
-    consulta: str = Field(..., description="Pregunta del usuario o jurado")
-    modalidad: str = "tvn_editorial"
+class GenerateDraftRequest(BaseModel):
+    """Identifies a server-resolved case; client evidence and scores are never accepted."""
 
-
-class QueryResponse(BaseModel):
-    consulta: str
-    respuesta: str
-    es_abstencion: bool
-    citas: List[Dict[str, Any]] = Field(default_factory=list)
+    caso_id: str
 
 
 def get_copilot_service(settings: Settings = Depends(get_settings)) -> CopilotService:
@@ -103,13 +100,18 @@ async def check_contradictions(
 
 @router.post("/api/v1/copilot/generate-draft", response_model=BorradorEditorial, tags=["Copilot"])
 async def generate_draft(
-    caso: FichaCaso,
+    req: GenerateDraftRequest,
     service: CopilotService = Depends(get_copilot_service),
 ) -> BorradorEditorial:
-    """Generates a complete TVN editorial package with citations for a given case."""
+    """Generates a package for a case resolved from the server's current corpus."""
     try:
+        caso = await service.get_agenda_case(req.caso_id)
+        if caso is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caso no encontrado en la agenda actual.")
         borrador = await service.generate_tvn_editorial_package(caso)
         return borrador
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -117,13 +119,138 @@ async def generate_draft(
         ) from exc
 
 
+@router.post("/api/v1/copilot/generate-banking-draft", response_model=BorradorBancario, tags=["Copilot"])
+async def generate_banking_draft(
+    req: GenerateDraftRequest,
+    service: CopilotService = Depends(get_copilot_service),
+) -> BorradorBancario:
+    """Generates an economic and logistics environment bulletin for banking analysts (CU-05)."""
+    try:
+        caso = await service.get_agenda_case(req.caso_id)
+        if caso is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Caso no encontrado en la agenda actual.")
+        borrador = await service.generate_banking_bulletin(caso)
+        return borrador
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+@router.post("/api/v1/copilot/query", response_model=QueryResponse, tags=["Copilot"])
+async def query_copilot(
+    req: QueryRequest,
+    service: CopilotService = Depends(get_copilot_service),
+) -> QueryResponse:
+    """Answers analytical or editorial questions with citations or explicit abstention (T04, T05, T06, T07)."""
+    return await service.answer_query_async(consulta=req.consulta, modalidad=req.modalidad)
+
+
+@router.get("/api/v1/copilot/fichas", response_model=List[FichaCaso], tags=["Copilot"])
+async def get_fichas(
+    settings: Settings = Depends(get_settings),
+    service: CopilotService = Depends(get_copilot_service),
+) -> List[FichaCaso]:
+    """Lists persisted cases together with the current live agenda."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    fichas_raw = storage.get_all_fichas()
+    if not fichas_raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            fichas_raw = storage.get_all_fichas()
+    fichas = {f.id_caso: f for f in (FichaCaso.model_validate(raw) for raw in fichas_raw)}
+    if settings.ENVIRONMENT != "test":
+        live_agenda = await service.prioritize_agenda_async(top_n=20)
+        for ficha in live_agenda:
+            if ficha.origen_datos == "ingesta_viva":
+                fichas[ficha.id_caso] = ficha
+    return sorted(fichas.values(), key=lambda ficha: (-ficha.puntaje, ficha.id_caso))
+
+
+@router.get("/api/v1/copilot/fichas/export", tags=["Copilot"])
+async def export_fichas(
+    service: CopilotService = Depends(get_copilot_service),
+    settings: Settings = Depends(get_settings),
+) -> List[Dict[str, Any]]:
+    """Exports all case cards as a list of dictionaries for downstream auditing."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    fichas_raw = storage.get_all_fichas()
+    if not fichas_raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            fichas_raw = storage.get_all_fichas()
+    fichas = {str(raw["id_caso"]): raw for raw in fichas_raw}
+    if settings.ENVIRONMENT != "test":
+        live_agenda = await service.prioritize_agenda_async(top_n=20)
+        for ficha in live_agenda:
+            if ficha.origen_datos == "ingesta_viva":
+                fichas[ficha.id_caso] = ficha.model_dump()
+    return sorted(fichas.values(), key=lambda ficha: (-float(ficha.get("puntaje", 0.0)), str(ficha["id_caso"])))
+
+
+@router.get("/api/v1/copilot/fichas/{id_caso}", response_model=FichaCaso, tags=["Copilot"])
+async def get_ficha_by_id(
+    id_caso: str,
+    settings: Settings = Depends(get_settings),
+    service: CopilotService = Depends(get_copilot_service),
+) -> FichaCaso:
+    """Retrieves a single case card by ID."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+    raw = storage.get_ficha(id_caso)
+    if not raw:
+        seed_path = settings.DATA_DIR / "fichas.jsonl"
+        if seed_path.exists():
+            storage.seed_fichas_from_jsonl(seed_path)
+            raw = storage.get_ficha(id_caso)
+    if not raw and settings.ENVIRONMENT != "test":
+        live_case = await service.get_agenda_case(id_caso)
+        if live_case and live_case.origen_datos == "ingesta_viva":
+            return live_case
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Ficha {id_caso} no encontrada.",
+        )
+    return FichaCaso.model_validate(raw)
+
+
 @router.post("/api/v1/copilot/review", response_model=FichaCaso, tags=["Human-in-the-loop"])
 async def update_review(
     req: ReviewUpdateRequest,
     service: CopilotService = Depends(get_copilot_service),
+    settings: Settings = Depends(get_settings),
 ) -> FichaCaso:
-    """Transitions a case through human review states."""
-    # Find case in agenda
+    """Transitions a case through human review states and persists the decision in SQLite."""
+    from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
+
+    storage = SQLiteStorage(settings.SQLITE_DB_PATH)
+    storage.init_db()
+
+    existing = storage.get_ficha(req.caso_id)
+    if existing:
+        updated_dict = storage.update_review_status(
+            id_caso=req.caso_id,
+            nuevo_estado=req.nuevo_estado.value,
+            persona_revisora=req.persona_revisora,
+            observaciones=req.observaciones,
+        )
+        if updated_dict:
+            return FichaCaso.model_validate(updated_dict)
+
     agenda = await service.prioritize_agenda_async(top_n=20)
     for c in agenda:
         if c.id_caso == req.caso_id:
@@ -133,10 +260,12 @@ async def update_review(
                 persona_revisora=req.persona_revisora,
                 observaciones=req.observaciones,
             )
+            storage.upsert_ficha(updated)
             return updated
+
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail=f"Caso {req.caso_id} no encontrado en la agenda actual.",
+        detail=f"Caso {req.caso_id} no encontrado en la base de datos ni en la agenda actual.",
     )
 
 
@@ -145,15 +274,10 @@ async def get_manifest(
     service: CopilotService = Depends(get_copilot_service),
 ) -> Manifest:
     """Returns reproducibility manifest with SHA-256 hashes."""
-    manifest_path = service.settings.DATA_DIR / "manifest.json"
-    if manifest_path.exists():
-        import json
-
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return Manifest.model_validate(data)
-
-    return service.repo.generate_manifest(service.settings.DATA_DIR)
+    try:
+        return service.get_reproducibility_manifest()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/api/v1/ingestion/status", tags=["Live Ingestion"])
@@ -193,3 +317,14 @@ async def get_live_noticias(
     storage = SQLiteStorage(settings.SQLITE_DB_PATH)
     storage.init_db()
     return storage.get_latest_noticias(limit=limit)
+
+
+@router.get("/api/v1/copilot/benchmark/metrics", tags=["Copilot"])
+async def get_benchmark_metrics(
+    service: CopilotService = Depends(get_copilot_service),
+) -> Dict[str, Any]:
+    """Returns official evaluation benchmark metrics and comparative baseline results (Sección 8 & 9.1)."""
+    from hackiathon_reto_tvn.services.baseline_evaluator import BaselineEvaluator
+
+    evaluator = BaselineEvaluator(service=service, settings=service.settings)
+    return await evaluator.run_benchmark_suite(only_dev=True)

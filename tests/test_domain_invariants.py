@@ -15,6 +15,7 @@ from hackiathon_reto_tvn.config import Settings
 from hackiathon_reto_tvn.domain import models as domain_models
 from hackiathon_reto_tvn.domain.models import (
     Afirmacion,
+    BorradorBancario,
     BorradorEditorial,
     CitaEvidencia,
     ComponentesPuntaje,
@@ -25,6 +26,7 @@ from hackiathon_reto_tvn.domain.models import (
     TipoAfirmacion,
 )
 from hackiathon_reto_tvn.domain.safety import SafetyGuard
+from hackiathon_reto_tvn.ports.decision_port import ChoiceAnswer, DecisionResult, ScoreAnswer
 from hackiathon_reto_tvn.ports.llm_port import BaseLLMClient
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
@@ -115,7 +117,8 @@ class _CapturingLLM(BaseLLMClient):
 
 
 async def _mock_draft() -> BorradorEditorial:
-    return await MockLLMAdapter().generate_structured("", BorradorEditorial)
+    prompt = SafetyGuard.format_as_data_payload("NOT-001", "MOP anuncia plan de vías", "MOP anuncia plan de vías")
+    return await MockLLMAdapter().generate_structured(prompt, BorradorEditorial)
 
 
 # --- T03: recirculation compares dates, not raw timestamps -------------------------------------------------
@@ -143,6 +146,37 @@ def test_frozen_corpus_flags_only_the_genuinely_old_article() -> None:
     assert flagged == {"NOT-009"}
 
 
+@pytest.mark.asyncio
+async def test_injected_source_cannot_become_publishable_even_with_high_decision_scores(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = CopilotService(settings=Settings(_env_file=None, ENVIRONMENT="test"))
+    malicious = next(item for item in service.load_query_news() if item.id_noticia == "NOT-010")
+    monkeypatch.setattr(service, "load_agenda_corpus", lambda: ([malicious], "snapshot_congelado"))
+
+    async def high_scores(**_: object) -> DecisionResult:
+        return DecisionResult(
+            answers={
+                **{key: ScoreAnswer(expected_score=1.0) for key in ("relevancia", "impacto", "urgencia", "novedad")},
+                "tipo_afirmacion": ChoiceAnswer(answer="hecho"),
+            },
+            provider_name="mock",
+            model_name="controlled-high-scores",
+        )
+
+    monkeypatch.setattr(service.decision_client, "decide", high_scores)
+    [case] = await service.prioritize_agenda_async(top_n=1)
+
+    assert case.puntaje >= 70.0
+    assert case.estado_evidencia == EstadoEvidencia.INSUFICIENTE
+    assert case.componentes.evidencia_disponible == 0.0
+    assert case.afirmaciones == []
+    assert case.ids_fuente == ["NOT-010"]
+    assert case.citas[0].texto_sustento == malicious.titulo
+    with pytest.raises(ValueError, match="evidencia insuficiente"):
+        await service.generate_tvn_editorial_package(case)
+
+
 # --- Citation coverage + human-in-the-loop ----------------------------------------------------------------
 
 
@@ -160,6 +194,32 @@ async def test_draft_with_uncited_fact_is_rejected_in_strict_mode() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("claim_type", [None, TipoAfirmacion.HIPOTESIS])
+async def test_draft_cannot_skip_factual_citation_check_by_omitting_facts(claim_type: TipoAfirmacion | None) -> None:
+    draft = await _mock_draft()
+    draft.afirmaciones = (
+        [Afirmacion(id_afirmacion="AF-X", texto="Impacto no evaluado", tipo=claim_type)] if claim_type else []
+    )
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="afirmación factual"):
+        await service.generate_tvn_editorial_package(caso)
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
+
+
+@pytest.mark.asyncio
+async def test_headline_only_label_is_derived_from_case_evidence() -> None:
+    draft = await _mock_draft()
+    draft.basado_unicamente_en_titular_metadatos = False
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+
+    with pytest.raises(ValueError, match="titular/metadatos"):
+        await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
 async def test_draft_citing_unknown_source_is_rejected() -> None:
     draft = await _mock_draft()
     draft.afirmaciones[0].citas[0].id_fuente = "NOT-FANTASMA"
@@ -167,6 +227,57 @@ async def test_draft_citing_unknown_source_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="cobertura de citas"):
         await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
+async def test_draft_citation_with_valid_id_but_unsupported_details_is_rejected() -> None:
+    draft = await _mock_draft()
+    draft.afirmaciones[0].texto += " y construirá tres puentes."
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+
+    with pytest.raises(ValueError, match="cobertura de citas"):
+        await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "content"),
+    [
+        ("brief_250", "palabra " * 251),
+        ("copy_digital_80", "palabra " * 81),
+        ("guion_45_60s", "guion demasiado corto"),
+    ],
+)
+async def test_editorial_package_rejects_outputs_outside_configured_limits(field: str, content: str) -> None:
+    draft = await _mock_draft()
+    setattr(draft, field, content)
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="límite editorial"):
+        await service.generate_tvn_editorial_package(caso)
+
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
+
+
+@pytest.mark.asyncio
+async def test_banking_bulletin_rejects_summary_over_250_words() -> None:
+    draft = BorradorBancario(
+        resumen_250="palabra " * 251,
+        horizonte_temporal="Corto plazo",
+        preguntas_analista=["¿Qué falta verificar?", "¿Qué fuente lo confirma?", "¿Cuál es el periodo?"],
+        observacion="Observación pendiente de verificar.",
+        hipotesis_impacto="Hipótesis por evaluar.",
+    )
+    service = CopilotService(settings=Settings(), llm_client=_CapturingLLM(draft))  # type: ignore[arg-type]
+    caso = _caso()
+
+    with pytest.raises(ValueError, match="resumen bancario.*máximo 250"):
+        await service.generate_banking_bulletin(caso)
+
+    assert caso.borrador == {}
+    assert caso.estado_revision == EstadoRevision.NUEVO
 
 
 @pytest.mark.asyncio

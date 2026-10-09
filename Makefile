@@ -2,7 +2,10 @@
 # Makefile - HackIAthon TVN Media Engineering Automation
 # ==============================================================================
 
-.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks
+.PHONY: help install sync lint format format-check typecheck test check run cli docker-build docker-run fly-status fly-deploy manifest setup-hooks benchmark audit-snapshot prepare-snapshot sqlite-snapshot
+
+SNAPSHOT_DIR ?= data
+CANDIDATE_DIR ?= /private/tmp/hackiathon-snapshot-candidate
 
 help:
 	@echo "Comandos disponibles:"
@@ -15,9 +18,13 @@ help:
 	@echo "  make typecheck     - Verificar tipos estáticos con mypy"
 	@echo "  make check         - Gate completo: ruff + format-check + mypy + pytest (ejecutar antes de terminar)"
 	@echo "  make test          - Ejecutar suite completa con pytest y cobertura"
+	@echo "  make benchmark     - Ejecutar el conjunto de desarrollo (40 consultas) y sus baselines"
 	@echo "  make run           - Levantar servidor FastAPI localmente en puerto 8080"
 	@echo "  make cli           - Ver estado del CLI del copiloto"
 	@echo "  make manifest      - Regenerar manifest.json con hashes SHA-256"
+	@echo "  make audit-snapshot - Auditar cobertura y hashes de una carpeta snapshot (sin escribir)"
+	@echo "  make prepare-snapshot - Crear snapshot temporal (solo se publica si cumple todos los mínimos)"
+	@echo "  make sqlite-snapshot - Empaquetar el corpus congelado como snapshot SQLite de solo lectura"
 	@echo "  make docker-build  - Construir imagen Docker de producción"
 	@echo "  make docker-run    - Correr contenedor Docker local en puerto 8080"
 	@echo "  make fly-status    - Consultar estado de máquinas en Fly.io"
@@ -49,6 +56,18 @@ typecheck:
 
 test:
 	uv run pytest
+
+benchmark:
+	uv run python scripts/run_benchmark.py
+
+audit-snapshot:
+	uv run python scripts/audit_snapshot.py --data-dir "$(SNAPSHOT_DIR)"
+
+prepare-snapshot:
+	uv run python scripts/prepare_snapshot.py --output-dir "$(CANDIDATE_DIR)"
+
+sqlite-snapshot:
+	uv run python scripts/build_sqlite_snapshot.py
 
 check: lint format-check typecheck test
 

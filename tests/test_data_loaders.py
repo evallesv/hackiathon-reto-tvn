@@ -3,6 +3,9 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from hackiathon_reto_tvn.adapters.data.loaders import (
     EventGrouper,
@@ -28,11 +31,82 @@ def test_load_indicadores_null_preservation() -> None:
     assert len(null_entries) >= 1
 
 
+def test_load_indicadores_preserves_missing_country_and_year_as_null(tmp_path: Path) -> None:
+    path = tmp_path / "indicadores.csv"
+    path.write_text("pais_iso3,indicador_id,anio,valor,unidad\n,NY.GDP.MKTP.CD,,12.5,USD\n", encoding="utf-8")
+
+    indicadores = LocalStorageRepository().load_indicadores(path)
+
+    assert len(indicadores) == 1
+    assert indicadores[0].pais_iso3 is None
+    assert indicadores[0].indicador_id == "NY.GDP.MKTP.CD"
+    assert indicadores[0].anio is None
+
+
 def test_load_eventos_geojson() -> None:
     repo = LocalStorageRepository()
     eventos = repo.load_eventos(Path("data/raw/eventos.geojson"))
     assert len(eventos) == 3
     assert eventos[0].magnitude >= 3.0
+
+
+def _usgs_feature(event_id: str) -> dict[str, Any]:
+    return {
+        "type": "Feature",
+        "id": event_id,
+        "properties": {
+            "mag": 4.2,
+            "time": 1720000000000,
+            "updated": 1720000001000,
+            "place": "Panama region",
+            "status": "reviewed",
+            "url": f"https://earthquake.usgs.gov/event/{event_id}",
+        },
+        "geometry": {"type": "Point", "coordinates": [-80.0, 8.0, 10.0]},
+    }
+
+
+@pytest.mark.parametrize("missing_field", ["mag", "time", "updated", "coordinates", "depth"])
+def test_usgs_loader_excludes_incomplete_features_without_imputing_zero(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, missing_field: str
+) -> None:
+    incomplete = _usgs_feature("USGS-INCOMPLETE")
+    if missing_field in {"mag", "time", "updated"}:
+        incomplete["properties"].pop(missing_field)
+    elif missing_field == "coordinates":
+        incomplete["geometry"].pop("coordinates")
+    else:
+        incomplete["geometry"]["coordinates"].pop()
+    path = tmp_path / "eventos.geojson"
+    path.write_text(
+        json.dumps({"type": "FeatureCollection", "features": [incomplete, _usgs_feature("USGS-COMPLETE")]}),
+        encoding="utf-8",
+    )
+
+    events = LocalStorageRepository().load_eventos(path)
+
+    assert [event.id for event in events] == ["USGS-COMPLETE"]
+    assert "USGS-INCOMPLETE" in caplog.text
+    assert "Error parsing feature" in caplog.text
+
+
+def test_usgs_loader_preserves_real_numeric_zeros(tmp_path: Path) -> None:
+    feature = _usgs_feature("USGS-ZERO")
+    feature["properties"].update(mag=0.0, time=0, updated=0)
+    feature["geometry"]["coordinates"] = [0.0, 0.0, 0.0]
+    path = tmp_path / "eventos.geojson"
+    path.write_text(json.dumps({"type": "FeatureCollection", "features": [feature]}), encoding="utf-8")
+
+    [event] = LocalStorageRepository().load_eventos(path)
+
+    assert (event.magnitude, event.time, event.updated, event.longitude, event.latitude, event.depth) == (
+        0.0,
+        0,
+        0,
+        0.0,
+        0.0,
+        0.0,
+    )
 
 
 def test_manifest_sha256_generation(tmp_path: Path) -> None:
@@ -83,3 +157,59 @@ def test_event_grouper_deduplication() -> None:
     assert len(clusters) == 1
     grouped_items = list(clusters.values())[0]
     assert len(grouped_items) == 2
+
+
+def test_event_grouper_matches_paraphrased_headlines_with_shared_entities() -> None:
+    first = Noticia(
+        id_noticia="N1",
+        titulo="Canal de Panamá reduce tránsito por sequía",
+        url="https://tvn.com/1",
+        medio="TVN",
+        fecha_publicacion="2026-10-01",
+        fecha_deteccion="2026-10-01",
+        fecha_extraccion="2026-10-01",
+        tema="logistica",
+        origen="rss",
+    )
+    paraphrase = Noticia(
+        id_noticia="N2",
+        titulo="Sequía obliga al Canal de Panamá a limitar el tránsito",
+        url="https://critica.com/2",
+        medio="Critica",
+        fecha_publicacion="2026-10-02",
+        fecha_deteccion="2026-10-02",
+        fecha_extraccion="2026-10-02",
+        tema="logistica",
+        origen="rss",
+    )
+
+    clusters = EventGrouper.group_articles([first, paraphrase])
+
+    assert len(clusters) == 1
+    assert len(next(iter(clusters.values()))) == 2
+
+
+def test_event_grouper_does_not_merge_different_events_with_generic_opening() -> None:
+    first = Noticia(
+        id_noticia="N1",
+        titulo="Gobierno anuncia plan de seguridad nacional",
+        url="https://tvn.com/1",
+        medio="TVN",
+        fecha_publicacion="2026-10-01",
+        fecha_deteccion="2026-10-01",
+        fecha_extraccion="2026-10-01",
+        tema="politica",
+        origen="rss",
+    )
+    second = first.model_copy(
+        update={
+            "id_noticia": "N2",
+            "titulo": "Gobierno anuncia plan de vacunación escolar",
+            "url": "https://critica.com/2",
+            "medio": "Critica",
+        }
+    )
+
+    clusters = EventGrouper.group_articles([first, second])
+
+    assert len(clusters) == 2

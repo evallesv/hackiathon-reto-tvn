@@ -1,7 +1,7 @@
 """Application configuration and settings management via pydantic-settings.
 
 Supports environment variables and .env files with interchangeable LLM providers:
-- opencode (Default: model muse-spark-1.3-contributor-free)
+- opencode (Default: model muse-spark-1.3-contributor)
 - gemini (Alternative: model gemini-2.5-flash / gemini-1.5-flash)
 - mock (Offline testing and CI fallback)
 """
@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     PROCESSED_DATA_DIR: Path = Path("data/processed")
     BENCHMARK_PATH: Path = Path("data/benchmark.jsonl")
     MANIFEST_PATH: Path = Path("data/manifest.json")
+    SQLITE_SNAPSHOT_PATH: Path = Field(
+        default=Path("data/snapshot/snapshot.sqlite"),
+        description="Ruta al snapshot SQLite local, de solo lectura, del corpus congelado",
+    )
 
     # Storage & SQLite Database
     SQLITE_DB_PATH: Path = Field(
@@ -104,6 +108,11 @@ class Settings(BaseSettings):
         default=60,
         description="Intervalo en minutos para la ingesta periódica en segundo plano",
     )
+    LIVE_AGENDA_MAX_AGE_DAYS: int = Field(
+        default=90,
+        ge=1,
+        description="Ventana retrospectiva máxima de noticias vivas consideradas recientes en la agenda",
+    )
 
     # Notion Integration
     NOTION_API_KEY: str = ""
@@ -114,6 +123,7 @@ class Settings(BaseSettings):
     MAX_WORDS_TVN_DIGITAL_COPY: int = 80
     SCRIPT_DURATION_SECONDS_MIN: int = 45
     SCRIPT_DURATION_SECONDS_MAX: int = 60
+    SCRIPT_WORDS_PER_MINUTE: int = 150
     STRICT_CITATION_VERIFICATION: bool = True
     PROMPT_INJECTION_SHIELD_ENABLED: bool = True
 

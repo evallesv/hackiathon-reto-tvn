@@ -22,9 +22,11 @@ La sección 4 del reto estipula una herramienta de ordenamiento (puntaje de aten
 3. Implementar ordenamiento compuesto en Python: `(-c.puntaje, -c.componentes.urgencia, c.id_caso)`.
 4. Implementar `can_publish_draft(caso)` que bloquea la habilitación de borradores si `estado_evidencia == INSUFICIENTE`, retornando una advertencia explícita.
 5. Dejar la decisión final de publicación y verificación en manos de la persona revisora mediante la máquina de estados: `nuevo`, `en_revision`, `requiere_evidencia`, `aprobado_como_borrador`, `descartado`.
+6. En la agenda basada solo en noticias, no inferir corroboración independiente por cantidad de medios ni marcar RSS/TVN como fuente oficial. Hasta que el corpus incluya linaje de fuente original y vínculos oficiales comprobables, `E=0.4` y el estado se mantiene `parcial`.
 
 ## Consecuencias
 
 ### Positivas
 * Cumplimiento estricto con las pruebas de aceptación T08 y las directrices éticas del hackathon.
 * Explicabilidad total: cada cálculo expone el desglose de sus 5 componentes y la versión de las reglas aplicadas.
+* La evidencia de noticias sindicadas no se sobrecuenta. La limitación actual es que el modelo de noticias no registra de forma estructurada la agencia o procedencia original; enriquecer ese contrato requerirá una versión de datos posterior.

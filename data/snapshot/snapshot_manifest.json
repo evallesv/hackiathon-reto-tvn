@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "snapshot_file": "snapshot.sqlite",
+  "snapshot_sha256": "179e2d84eee7b7ffcfa0bfecc9294cacb03a63e7e0a18bd447c4b4a47a822463",
+  "fecha_corte_utc": "2026-10-09T05:08:26.624630+00:00",
+  "source_manifest_sha256": "6552307654fe3486f2b090984d3ae3e6a5498c5fd196824102a074b04d7335cd",
+  "source_live_content_sha256": "069f36483b366141ed4a85354ba703324224d223a865830756325326d4c5ab80",
+  "source_live_content_counts": {
+    "noticias": 120,
+    "indicadores": 96,
+    "eventos": 7
+  },
+  "counts": {
+    "eventos": 3,
+    "eventos_vivos": 7,
+    "indicadores": 540,
+    "noticias": 130
+  },
+  "indicator_grid": {
+    "expected_combinations": 540,
+    "populated_values": 98,
+    "null_values": 442,
+    "missing_values_are_null_not_imputed": true
+  },
+  "included_tables": [
+    "noticias",
+    "indicadores",
+    "eventos",
+    "eventos_vivos",
+    "snapshot_metadata"
+  ],
+  "excluded_tables": [
+    "fichas_casos",
+    "ingestion_runs"
+  ],
+  "operational_ingestion_included": true
+}

@@ -1,0 +1,221 @@
+{
+  "tarea": "Detección de Contradicciones Fácticas (T05)",
+  "metrica": "Macro-F1 / Precision / Recall",
+  "baseline_regex": {
+    "precision": 0.714,
+    "recall": 1.0,
+    "f1": 0.792,
+    "f1_positivo": 0.833,
+    "accuracy": 0.8,
+    "f1_tipo": "macro",
+    "limitacion": "Produce falsos positivos cuando dos fuentes citan diferentes métricas válidas del mismo evento."
+  },
+  "modelo_decision": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "f1_positivo": 1.0,
+    "accuracy": 1.0,
+    "f1_tipo": "macro",
+    "provider": "jev",
+    "model": "jev-1.13-free",
+    "provider_configurado": "jev",
+    "model_configurado": "jev-1.13-free",
+    "ejecuciones_por_proveedor_modelo": {
+      "jev/jev-1.13-free": 10
+    },
+    "ejecuciones_fallback": 0,
+    "muestra": 10,
+    "latencia_mediana_ms": 609.28,
+    "latencia_p95_ms": 863.804,
+    "limitacion": "Diez pares sintéticos; no constituye validación editorial independiente."
+  },
+  "detalle": [
+    {
+      "id": "CONTRADICCION-01",
+      "texto_a": "Inversión en vías asciende a 15 millones",
+      "texto_b": "Contratista afirma 28 millones de inversión",
+      "etiqueta_desarrollo": true,
+      "prediccion_regex": true,
+      "prediccion_modelo": true,
+      "probabilidad_modelo": 0.94,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 698.327
+    },
+    {
+      "id": "CONTRADICCION-02",
+      "texto_a": "Inicio de obras fijado para el lunes",
+      "texto_b": "Ministro posterga inicio de obras para el próximo mes",
+      "etiqueta_desarrollo": true,
+      "prediccion_regex": true,
+      "prediccion_modelo": true,
+      "probabilidad_modelo": 0.8,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 549.389
+    },
+    {
+      "id": "CONTRADICCION-03",
+      "texto_a": "Ajuste de calado en 44 pies",
+      "texto_b": "Autoridad canalera confirma calado de 45 pies",
+      "etiqueta_desarrollo": true,
+      "prediccion_regex": true,
+      "prediccion_modelo": true,
+      "probabilidad_modelo": 0.91,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 521.006
+    },
+    {
+      "id": "CONTRADICCION-04",
+      "texto_a": "Reportan 5,000 usuarios sin servicio",
+      "texto_b": "Regulador constata 18,000 usuarios afectados",
+      "etiqueta_desarrollo": true,
+      "prediccion_regex": true,
+      "prediccion_modelo": true,
+      "probabilidad_modelo": 0.86,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 761.781
+    },
+    {
+      "id": "CONTRADICCION-05",
+      "texto_a": "Costo de obra estimado en $2 millones",
+      "texto_b": "Auditoría revela costo de $4.5 millones",
+      "etiqueta_desarrollo": true,
+      "prediccion_regex": true,
+      "prediccion_modelo": true,
+      "probabilidad_modelo": 0.92,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 716.356
+    },
+    {
+      "id": "CONTRADICCION-06",
+      "texto_a": "ACP anuncia nuevo calado tras lluvias",
+      "texto_b": "Calado operacional se fija en 45 pies por la ACP",
+      "etiqueta_desarrollo": false,
+      "prediccion_regex": false,
+      "prediccion_modelo": false,
+      "probabilidad_modelo": 0.14,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 530.325
+    },
+    {
+      "id": "CONTRADICCION-07",
+      "texto_a": "Sismo de 4.8 en Golfo de Chiriquí",
+      "texto_b": "Evento sísmico de magnitud 4.8 registrado por USGS",
+      "etiqueta_desarrollo": false,
+      "prediccion_regex": false,
+      "prediccion_modelo": false,
+      "probabilidad_modelo": 0.1,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 478.095
+    },
+    {
+      "id": "CONTRADICCION-08",
+      "texto_a": "PIB de Panamá creció 7.3% en 2023",
+      "texto_b": "Banco Mundial reporta 7.3% de crecimiento para Panamá",
+      "etiqueta_desarrollo": false,
+      "prediccion_regex": true,
+      "prediccion_modelo": false,
+      "probabilidad_modelo": 0.06,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 500.012
+    },
+    {
+      "id": "CONTRADICCION-09",
+      "texto_a": "Trabajos de mantenimiento programados",
+      "texto_b": "Cuadrillas ejecutan mantenimiento en vía principal",
+      "etiqueta_desarrollo": false,
+      "prediccion_regex": false,
+      "prediccion_modelo": false,
+      "probabilidad_modelo": 0.15,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 669.171
+    },
+    {
+      "id": "CONTRADICCION-10",
+      "texto_a": "Inflación oficial de 1.5% en 2023",
+      "texto_b": "Serie del Banco Mundial registra 1.5% en Panamá",
+      "etiqueta_desarrollo": false,
+      "prediccion_regex": true,
+      "prediccion_modelo": false,
+      "probabilidad_modelo": 0.12,
+      "proveedor_efectivo": "jev",
+      "modelo_efectivo": "jev-1.13-free",
+      "uso_fallback": false,
+      "latencia_ms": 863.804
+    }
+  ],
+  "fecha_ejecucion_utc": "2026-10-09T13:31:44.303289+00:00",
+  "codigo_commit": "da3ae2ea7fb54a70ba6608065eeb7110a271481d",
+  "comando_reproduccion": "Ver docs/validation/README.md: ejecutar únicamente la comparación de contradicciones con el proveedor configurado.",
+  "conjunto": "Diez pares sintéticos de desarrollo; etiquetas expuestas en código, sin revisión editorial independiente.",
+  "uso_api_por_llamada": [
+    {
+      "input_tokens": 342,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 337,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 343,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 345,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 340,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 340,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 350,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 349,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 336,
+      "output_tokens": 24
+    },
+    {
+      "input_tokens": 347,
+      "output_tokens": 24
+    }
+  ],
+  "tokens_totales": null,
+  "costo": null,
+  "limitacion_costo": "No se cuenta con costo por llamada verificado; no se asume gratuidad por el nombre del modelo.",
+  "codigo_commit_original_antes_de_rebase": "5a76e198caf84a3f7605449e6a981c0d33a0fdd4",
+  "codigo_fuentes_sha256": {
+    "src/hackiathon_reto_tvn/services/baseline_evaluator.py": "f191856f4b95ee33394a0783edec29643e6254347f3d8a5f2c7a738a2af0ed55",
+    "src/hackiathon_reto_tvn/services/copilot_service.py": "37ff486623e9a7c769e207017daf3d73fb89e2e612011537d1235a40cd14e7b7",
+    "src/hackiathon_reto_tvn/adapters/decision/jev_adapter.py": "de9afb3fd8e89a801460162d7e88e1c65de85bb9a711df795f1558ca4fadc659",
+    "src/hackiathon_reto_tvn/ports/decision_port.py": "ffba721b10acbbf6353d55dbbd44e70654c6ee70251278a15746ab5f6c733123"
+  }
+}
