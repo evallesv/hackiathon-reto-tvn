@@ -130,6 +130,11 @@ async def test_classification_metrics_attribute_mock_fallback_to_actual_provider
     evaluator.service.decision_client = RemoteWithFallback()
     report = await evaluator.evaluate_classification_and_contradictions_baseline()
 
+    assert len(report["detalle"]) == 10
+    assert all(row["proveedor_efectivo"] == "mock" and row["uso_fallback"] for row in report["detalle"])
+    assert all(isinstance(row["etiqueta_desarrollo"], bool) for row in report["detalle"])
+    assert all(row["latencia_ms"] >= 0.0 for row in report["detalle"])
+
     model = report["modelo_decision"]
     assert model["provider_configurado"] == "cloudflare"
     assert model["provider"] == "mock"

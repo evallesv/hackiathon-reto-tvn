@@ -12,6 +12,7 @@ import re
 import time
 from collections import Counter
 from pathlib import Path
+from statistics import median
 from typing import Any, Dict, List, Optional
 
 from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository
@@ -180,7 +181,12 @@ class BaselineEvaluator:
         baseline_metrics = compute_metrics(actuals, baseline_preds)
 
         # Query the configured adapter, rather than decorating regex outputs as model predictions.
-        decisions = [await self.service.detect_contradictions(text_a, text_b) for text_a, text_b, _ in eval_pairs]
+        decisions = []
+        latencies = []
+        for text_a, text_b, _ in eval_pairs:
+            started = time.perf_counter()
+            decisions.append(await self.service.detect_contradictions(text_a, text_b))
+            latencies.append((time.perf_counter() - started) * 1000)
         model_predictions = [bool(result["discrepancia_detectada"]) for result in decisions]
         providers = {str(result.get("proveedor_efectivo", "desconocido")) for result in decisions}
         models = {str(result.get("modelo_efectivo", "desconocido")) for result in decisions}
@@ -206,8 +212,28 @@ class BaselineEvaluator:
                 "ejecuciones_por_proveedor_modelo": dict(executions),
                 "ejecuciones_fallback": sum(bool(result.get("uso_fallback")) for result in decisions),
                 "muestra": len(eval_pairs),
+                "latencia_mediana_ms": round(median(latencies), 3),
+                "latencia_p95_ms": round(sorted(latencies)[min(int(len(latencies) * 0.95), len(latencies) - 1)], 3),
                 "limitacion": "Diez pares sintéticos; no constituye validación editorial independiente.",
             },
+            "detalle": [
+                {
+                    "id": f"CONTRADICCION-{index + 1:02d}",
+                    "texto_a": pair[0],
+                    "texto_b": pair[1],
+                    "etiqueta_desarrollo": pair[2],
+                    "prediccion_regex": baseline,
+                    "prediccion_modelo": decision["discrepancia_detectada"],
+                    "probabilidad_modelo": decision["probabilidad_discrepancia"],
+                    "proveedor_efectivo": decision["proveedor_efectivo"],
+                    "modelo_efectivo": decision["modelo_efectivo"],
+                    "uso_fallback": decision["uso_fallback"],
+                    "latencia_ms": round(latency, 3),
+                }
+                for index, (pair, baseline, decision, latency) in enumerate(
+                    zip(eval_pairs, baseline_preds, decisions, latencies, strict=True)
+                )
+            ],
         }
 
     async def run_benchmark_suite(

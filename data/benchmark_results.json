@@ -25,8 +25,8 @@
     "tokens_consumidos": null,
     "costo_medido_usd": null,
     "limite_costo": "Tokens y costo no instrumentados; no se declara costo cero ni costo de un proveedor real.",
-    "latencia_mediana_ms": 0.7,
-    "latencia_p95_ms": 1.7,
+    "latencia_mediana_ms": 0.8,
+    "latencia_p95_ms": 2.3,
     "meta_latencia": "mediana <= 15000 ms (15 s)"
   },
   "comparativa_baselines": {
@@ -76,8 +76,142 @@
         },
         "ejecuciones_fallback": 0,
         "muestra": 10,
+        "latencia_mediana_ms": 0.025,
+        "latencia_p95_ms": 0.038,
         "limitacion": "Diez pares sintéticos; no constituye validación editorial independiente."
-      }
+      },
+      "detalle": [
+        {
+          "id": "CONTRADICCION-01",
+          "texto_a": "Inversión en vías asciende a 15 millones",
+          "texto_b": "Contratista afirma 28 millones de inversión",
+          "etiqueta_desarrollo": true,
+          "prediccion_regex": true,
+          "prediccion_modelo": true,
+          "probabilidad_modelo": 0.95,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.038
+        },
+        {
+          "id": "CONTRADICCION-02",
+          "texto_a": "Inicio de obras fijado para el lunes",
+          "texto_b": "Ministro posterga inicio de obras para el próximo mes",
+          "etiqueta_desarrollo": true,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.029
+        },
+        {
+          "id": "CONTRADICCION-03",
+          "texto_a": "Ajuste de calado en 44 pies",
+          "texto_b": "Autoridad canalera confirma calado de 45 pies",
+          "etiqueta_desarrollo": true,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.024
+        },
+        {
+          "id": "CONTRADICCION-04",
+          "texto_a": "Reportan 5,000 usuarios sin servicio",
+          "texto_b": "Regulador constata 18,000 usuarios afectados",
+          "etiqueta_desarrollo": true,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.024
+        },
+        {
+          "id": "CONTRADICCION-05",
+          "texto_a": "Costo de obra estimado en $2 millones",
+          "texto_b": "Auditoría revela costo de $4.5 millones",
+          "etiqueta_desarrollo": true,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.027
+        },
+        {
+          "id": "CONTRADICCION-06",
+          "texto_a": "ACP anuncia nuevo calado tras lluvias",
+          "texto_b": "Calado operacional se fija en 45 pies por la ACP",
+          "etiqueta_desarrollo": false,
+          "prediccion_regex": false,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.025
+        },
+        {
+          "id": "CONTRADICCION-07",
+          "texto_a": "Sismo de 4.8 en Golfo de Chiriquí",
+          "texto_b": "Evento sísmico de magnitud 4.8 registrado por USGS",
+          "etiqueta_desarrollo": false,
+          "prediccion_regex": false,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.024
+        },
+        {
+          "id": "CONTRADICCION-08",
+          "texto_a": "PIB de Panamá creció 7.3% en 2023",
+          "texto_b": "Banco Mundial reporta 7.3% de crecimiento para Panamá",
+          "etiqueta_desarrollo": false,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.025
+        },
+        {
+          "id": "CONTRADICCION-09",
+          "texto_a": "Trabajos de mantenimiento programados",
+          "texto_b": "Cuadrillas ejecutan mantenimiento en vía principal",
+          "etiqueta_desarrollo": false,
+          "prediccion_regex": false,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.025
+        },
+        {
+          "id": "CONTRADICCION-10",
+          "texto_a": "Inflación oficial de 1.5% en 2023",
+          "texto_b": "Serie del Banco Mundial registra 1.5% en Panamá",
+          "etiqueta_desarrollo": false,
+          "prediccion_regex": true,
+          "prediccion_modelo": false,
+          "probabilidad_modelo": 0.05,
+          "proveedor_efectivo": "mock",
+          "modelo_efectivo": "mock-clef-offline",
+          "uso_fallback": false,
+          "latencia_ms": 0.024
+        }
+      ]
     }
   },
   "detalle": [
@@ -98,7 +232,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.9,
+      "latencia_ms": 2.3,
       "consulta": "¿Cuál fue el crecimiento del PIB de Panamá en 2023 según el Banco Mundial?"
     },
     {
@@ -118,7 +252,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.1,
+      "latencia_ms": 1.2,
       "consulta": "¿Qué magnitud tuvo el sismo reportado en Punta de Burica en marzo de 2024?"
     },
     {
@@ -178,7 +312,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.4,
+      "latencia_ms": 1.5,
       "consulta": "¿Cuál es la fecha original de publicación de la noticia sobre el puente recirculado?"
     },
     {
@@ -258,7 +392,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.6,
+      "latencia_ms": 0.9,
       "consulta": "¿Cuál fue la proporción de exportaciones sobre el PIB de Panamá en 2023?"
     },
     {
@@ -278,7 +412,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.7,
+      "latencia_ms": 1.0,
       "consulta": "¿Cuál fue el crecimiento del PIB de Costa Rica en 2023 según el Banco Mundial?"
     },
     {
@@ -298,7 +432,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.6,
+      "latencia_ms": 0.9,
       "consulta": "¿Qué crecimiento del PIB registró Colombia en 2023 en el dataset del Banco Mundial?"
     },
     {
@@ -318,7 +452,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.6,
+      "latencia_ms": 0.7,
       "consulta": "¿Cuál fue el crecimiento del PIB en República Dominicana en 2023?"
     },
     {
@@ -358,7 +492,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.6,
+      "latencia_ms": 0.7,
       "consulta": "¿Qué crecimiento de PIB reportó Guatemala en 2023 en la serie del Banco Mundial?"
     },
     {
@@ -378,7 +512,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.8,
+      "latencia_ms": 1.0,
       "consulta": "¿Qué profundidad tuvo el sismo de magnitud 4.8 en Punta de Burica según el reporte USGS?"
     },
     {
@@ -398,7 +532,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.8,
+      "latencia_ms": 0.9,
       "consulta": "¿Cuál fue la magnitud del evento sísmico en Coiba registrado por el catálogo regional?"
     },
     {
@@ -418,7 +552,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 0.8,
+      "latencia_ms": 1.0,
       "consulta": "¿Cuál es la profundidad registrada para el sismo en Puerto Armuelles?"
     },
     {
@@ -438,7 +572,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.4,
+      "latencia_ms": 1.5,
       "consulta": "¿Qué medio reportó inicialmente la reapertura del paso vehicular en el puente del interior?"
     },
     {
@@ -458,7 +592,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.4,
+      "latencia_ms": 3.3,
       "consulta": "¿Qué tema oficial se asignó a la noticia sobre el ajuste de calado del Canal?"
     },
     {
@@ -478,7 +612,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": true,
       "fuente_esperada_citada": true,
-      "latencia_ms": 1.4,
+      "latencia_ms": 2.0,
       "consulta": "¿Cuál es el origen de extracción registrado para el comunicado de la Autoridad del Canal?"
     },
     {
@@ -504,7 +638,7 @@
       "citas_ids_fuente_validos": false,
       "valor_esperado_presente": null,
       "fuente_esperada_citada": null,
-      "latencia_ms": 1.4,
+      "latencia_ms": 1.5,
       "consulta": "¿Cuál es la fecha real de inicio de obras si una fuente dice lunes y otra el mes entrante?"
     },
     {
@@ -517,7 +651,7 @@
       "citas_ids_fuente_validos": false,
       "valor_esperado_presente": null,
       "fuente_esperada_citada": null,
-      "latencia_ms": 1.4,
+      "latencia_ms": 1.8,
       "consulta": "¿Cuántos usuarios resultaron afectados por el corte eléctrico según los diferentes reportes?"
     },
     {
@@ -537,7 +671,7 @@
       "citas_ids_fuente_validos": true,
       "valor_esperado_presente": null,
       "fuente_esperada_citada": null,
-      "latencia_ms": 1.4,
+      "latencia_ms": 1.5,
       "consulta": "¿El ajuste de calado del Canal fue de 44 o 45 pies según las versiones circulantes?"
     },
     {
