@@ -11,6 +11,7 @@ from hackiathon_reto_tvn.domain.models import (
     EstadoEvidencia,
     FichaCaso,
     Modalidad,
+    Noticia,
 )
 from hackiathon_reto_tvn.main import app
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
@@ -32,6 +33,42 @@ async def test_query_world_bank_indicator_t04(copilot_service: CopilotService) -
     assert "2023" in resp.respuesta
     assert len(resp.citas) >= 1
     assert "PAN-NY.GDP.MKTP.KD.ZG-2023" in resp.citas[0]["id_fuente"]
+
+
+@pytest.mark.asyncio
+async def test_replicated_news_does_not_count_as_independent_evidence(
+    copilot_service: CopilotService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    articles = [
+        Noticia(
+            id_noticia="NOT-SYND-1",
+            titulo="ACP anuncia aumento del calado del Canal",
+            url="https://tvn-2.com/noticia/1",
+            medio="TVN Noticias",
+            fecha_publicacion="2026-10-01",
+            fecha_deteccion="2026-10-01",
+            fecha_extraccion="2026-10-01",
+            tema="logistica_canal",
+            origen="rss",
+        ),
+        Noticia(
+            id_noticia="NOT-SYND-2",
+            titulo="ACP anuncia aumento del calado en el Canal",
+            url="https://critica.com.pa/noticia/2",
+            medio="Crítica",
+            fecha_publicacion="2026-10-01",
+            fecha_deteccion="2026-10-01",
+            fecha_extraccion="2026-10-01",
+            tema="logistica_canal",
+            origen="gdelt",
+        ),
+    ]
+    monkeypatch.setattr(copilot_service, "load_corpus", lambda: (articles, len(articles)))
+
+    [case] = await copilot_service.prioritize_agenda_async(top_n=1)
+
+    assert case.estado_evidencia == EstadoEvidencia.PARCIAL
+    assert case.componentes.evidencia_disponible == 0.4
 
 
 @pytest.mark.asyncio

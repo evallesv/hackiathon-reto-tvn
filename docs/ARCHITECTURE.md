@@ -116,7 +116,7 @@ sequenceDiagram
     participant Humano as 8. Revisar (Human Review)
 
     Ingesta->>Agrupador: Valida noticias.csv (conserva nulos, filtra IDs)
-    Agrupador->>Contexto: Agrupa duplicados (misma agencia = 1 sola procedencia)
+    Agrupador->>Contexto: Agrupa titulares similares; no infiere independencia por número de medios
     Contexto->>Decisor: Clasifica tema, estima factores R, I, U, N y detecta contradicciones (T05)
     Decisor->>MotorScore: Retorna probabilidades tipadas y flags fácticos
     MotorScore->>Explicador: Calcula P = 30R + 25I + 20U + 15N + 10E (0-100)
@@ -259,4 +259,3 @@ El repositorio incluye la especificación íntegra de las 8 páginas obligatoria
 * `06-pruebas-y-metricas.md`: Matriz T01-T10, benchmark de 60 consultas y comparativa de baselines.
 * `07-riesgos-y-etica.md`: Matriz de riesgos, derechos de autor, sesgos y supervisión humana.
 * `08-presentacion-al-jurado.md`: Pitch oficial cronometrado de 10 minutos con guión verbal y respuestas clave.
-

@@ -126,9 +126,9 @@ class CopilotService:
                 urgencia = 0.20 if recirculated else decision_res.get_score("urgencia", 0.65)
                 novedad = 0.40 if len(cluster_items) > 1 else decision_res.get_score("novedad", 0.80)
 
-                # Provenance: distinct media count
-                medios = {a.medio for a in cluster_items}
-                evidencia_disp = min(1.0, 0.40 + 0.25 * len(medios))
+                # Publisher count alone cannot establish independent provenance or official corroboration.
+                # Until source lineage is represented in the data contract, count one verified provenance group.
+                evidencia_disp = 0.40
 
                 componentes = ComponentesPuntaje(
                     relevancia=relevancia,
@@ -140,9 +140,9 @@ class CopilotService:
 
                 puntaje = ScoringEngine.calculate_score(componentes)
                 estado_evidencia = ScoringEngine.evaluate_evidence_state(
-                    num_fuentes_primarias=len(cluster_items),
-                    tiene_verificacion_cruzada=(len(medios) > 1),
-                    tiene_datos_oficiales=(lead_art.origen == "rss" or "tvn" in lead_art.medio.lower()),
+                    num_fuentes_primarias=1,
+                    tiene_verificacion_cruzada=False,
+                    tiene_datos_oficiales=False,
                 )
 
                 claim_choice = decision_res.get_choice("tipo_afirmacion", "hecho")

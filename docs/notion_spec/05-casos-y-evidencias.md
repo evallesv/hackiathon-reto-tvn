@@ -3,6 +3,8 @@
 > **Espacio Oficial de Presentación en Notion Business**  
 > **Catálogo de 5 Fichas Canónicas Trazables, Borradores Editoriales y Demostración de Guardrails**
 
+> **Nota de auditoría:** Los cinco casos y sus nombres/estados de revisión son fixtures ilustrativos, no decisiones editoriales reales ni evidencia de una revisión humana. La agenda actual solo marca como parcial la evidencia basada en noticias cuando no hay linaje independiente u oficial verificable; no debe usarse esta tabla histórica para afirmar lo contrario.
+
 ---
 
 ## 1. Tabla Resumen de los 5 Casos Canónicos

@@ -219,7 +219,7 @@ make check
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **80 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **89 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
