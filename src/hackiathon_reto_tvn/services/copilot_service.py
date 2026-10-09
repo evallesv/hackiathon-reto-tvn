@@ -5,6 +5,7 @@ editorial draft generation, and human-in-the-loop review.
 
 import asyncio
 import hashlib
+import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -27,6 +28,7 @@ from hackiathon_reto_tvn.domain.models import (
     EventoGeoJSON,
     FichaCaso,
     Indicador,
+    Manifest,
     Modalidad,
     Noticia,
     QueryResponse,
@@ -60,6 +62,13 @@ class CopilotService:
         self.llm = llm_client or get_llm_client(self.settings)
         self.decision_client = decision_client or get_decision_client(self.settings)
         self.repo = repository or LocalStorageRepository()
+
+    def get_reproducibility_manifest(self) -> Manifest:
+        """Read the frozen manifest without creating or changing dataset files."""
+        manifest_path = self.settings.DATA_DIR / "manifest.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"No existe el manifiesto congelado: {manifest_path}")
+        return Manifest.model_validate(json.loads(manifest_path.read_text(encoding="utf-8")))
 
     def load_corpus(self) -> Tuple[List[Noticia], int]:
         """Loads the verified frozen SQLite snapshot, falling back to its raw-file inputs."""
@@ -723,7 +732,9 @@ class CopilotService:
                     "IT.NET.USER.ZS": "uso de internet",
                     "NE.EXP.GNFS.ZS": "exportaciones (% del PIB)",
                 }
-                ind_label = indicator_names.get(match.indicador_id, match.indicador_id)
+                ind_label = indicator_names.get(
+                    match.indicador_id or "", match.indicador_id or "indicador sin identificar"
+                )
                 unit_str = match.unidad if match.unidad != "personas" else " habitantes"
                 val_str = f"{match.valor:g}{unit_str}" if isinstance(match.valor, float) else f"{match.valor}{unit_str}"
                 return QueryResponse(

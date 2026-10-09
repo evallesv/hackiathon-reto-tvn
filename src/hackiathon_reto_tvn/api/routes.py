@@ -274,15 +274,10 @@ async def get_manifest(
     service: CopilotService = Depends(get_copilot_service),
 ) -> Manifest:
     """Returns reproducibility manifest with SHA-256 hashes."""
-    manifest_path = service.settings.DATA_DIR / "manifest.json"
-    if manifest_path.exists():
-        import json
-
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return Manifest.model_validate(data)
-
-    return service.repo.generate_manifest(service.settings.DATA_DIR)
+    try:
+        return service.get_reproducibility_manifest()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/api/v1/ingestion/status", tags=["Live Ingestion"])

@@ -2,7 +2,10 @@
 
 from fastapi.testclient import TestClient
 
+from hackiathon_reto_tvn.api.routes import get_copilot_service
+from hackiathon_reto_tvn.config import Settings
 from hackiathon_reto_tvn.main import app
+from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
 client = TestClient(app)
 
@@ -87,6 +90,19 @@ def test_manifest_endpoint() -> None:
     assert "archivos" in data
     assert "fecha_corte_utc" in data
     assert "fecha_corte_UTC" not in data
+
+
+def test_manifest_endpoint_does_not_create_missing_frozen_manifest(tmp_path) -> None:
+    service = CopilotService(settings=Settings(DATA_DIR=tmp_path))
+    app.dependency_overrides[get_copilot_service] = lambda: service
+
+    try:
+        response = client.get("/api/v1/copilot/manifest")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 404
+    assert not (tmp_path / "manifest.json").exists()
 
 
 def test_ingestion_endpoints() -> None:
