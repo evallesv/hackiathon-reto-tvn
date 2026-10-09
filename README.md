@@ -42,9 +42,10 @@ La solución combina un corpus público congelado (para evaluación reproducible
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
    - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
-   - En ejecución local offline del 2026-10-09 sobre el snapshot SQLite sellado, la recencia obtuvo P@5 **0.00 (0/5)** y la fórmula P **0.40 (2/5)**. Las etiquetas se basan en palabras clave y no son una evaluación editorial independiente; la mejora relativa queda como no disponible con baseline cero.
+   - En ejecución offline del 2026-10-09 sobre `data/raw/` verificado por manifiesto, la recencia obtuvo P@5 **0.20 (1/5)** y la fórmula P **0.40 (2/5)**, una mejora exploratoria de **+100%** basada en etiquetas por palabras clave. El benchmark desactiva SQLite operativo y el snapshot ampliado de demostración.
+   - En las 20 consultas sustentadas, el mock coincidió literalmente con el valor y el ID de fuente esperados (**20/20**); esta comprobación de desarrollo no es adjudicación editorial independiente ni mide implicación semántica.
    - La evaluación de contradicciones compara regex con diez pares sintéticos procesados por el adaptador de decisión configurado (`mock`, Cloudflare o Jev); informa Macro-F1 y el proveedor/modelo usados. El modo `mock` es determinista y no representa desempeño de un modelo remoto. La evaluación reservada requiere custodia externa.
-   - Las tasas de cita y abstención miden condiciones estructurales de respuestas seleccionadas; no verifican sustento semántico ni demuestran ausencia de alucinaciones.
+   - Las citas verifican IDs contra el corpus y las abstenciones/adversariales se cuentan en casos seleccionados; esto no verifica que cada afirmación esté citada, sustento semántico ni ausencia general de alucinaciones.
 7. **Extensión Modular para Sector Banca (CU-05)**:
    - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
 8. **Persistencia Transaccional SQLite WAL y Flujo Human-in-the-Loop**:
@@ -217,7 +218,7 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 134 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 142 tests Pytest)
 make check
 
 # Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
@@ -232,7 +233,7 @@ make prepare-snapshot CANDIDATE_DIR=/private/tmp/snapshot-candidate-2026-10
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **134 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **142 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |

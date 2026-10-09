@@ -340,7 +340,7 @@ Before marking any task as done, submitting a PR, or creating a commit, execute 
 - [ ] `uv run ruff check .` returns zero errors.
 - [ ] `uv run ruff format --check .` returns zero reformatting requirements.
 - [ ] `uv run mypy src/` returns `Success: no issues found`.
-- [ ] `uv run pytest` passes 100% of tests (currently 134 tests and T01–T10).
+- [ ] `uv run pytest` passes 100% of tests (currently 142 tests and T01–T10).
 - [ ] `git diff --stat -- data/` shows no changes (tests and features must not mutate the frozen dataset or `data/manifest.json`).
 - [ ] No hardcoded API keys or secrets exist in any file; `.env` was never modified or committed.
 - [ ] New behaviour has a test; a bug fix has a regression test that fails without the fix.
@@ -363,7 +363,8 @@ These are verified limitations of the current code. Do not assume the behaviour 
 | **Review persistence** | RESOLVED: `POST /review` persists human reviews in SQLite (`fichas_casos`) and updates `FichaCaso` records with reviewer and notes. | `adapters/data/sqlite_storage.py`, `api/routes.py` |
 | **API boundary** | RESOLVED: `/manifest` delegates to the application service; the service reads the frozen manifest and returns 404 if absent without generating or mutating dataset files. | `api/routes.py`, `services/copilot_service.py`, `tests/test_api.py` |
 | **Event grouping** | RESOLVED: deterministic grouping now compares normalized meaningful title terms, requires at least two shared terms and 60% overlap of the shorter title, and limits date-aware matches to 14 days. It is still a lexical heuristic; paraphrases without shared terms need semantic evaluation before claiming reliable event resolution. | `EventGrouper.group_articles`, `tests/test_data_loaders.py` |
-| **Benchmark isolation** | 40 development queries run locally. The 20 jury labels are colocated in the repository and therefore exposed; full-set execution is disabled. They cannot be called blind results until an external custodian supplies an isolated holdout. | `services/baseline_evaluator.py`, `scripts/run_benchmark.py`, `tests/test_benchmark_baseline.py` |
+| **Citation verification (T09)** | Strict mode validates structured `HECHO`/`DECLARACION` claims against known source IDs, quoted excerpts, and lexical terms. It does not extract every factual statement from free-text fields or prove semantic entailment. The benchmark separately measures only whether answerable responses cite resolvable corpus IDs. | `domain/safety.py`, `services/copilot_service.py`, `services/baseline_evaluator.py`, `tests/test_safety.py` |
+| **Benchmark isolation** | 40 development queries run against `data/raw/` verified by manifest; live SQLite and the augmented demo snapshot are disabled. The 20 jury labels are colocated in the repository and therefore exposed; full-set execution is disabled. They cannot be called blind results until an external custodian supplies an isolated holdout. | `services/baseline_evaluator.py`, `scripts/run_benchmark.py`, `tests/test_benchmark_baseline.py` |
 | **Indicator identity fields** | RESOLVED: missing or malformed `pais_iso3`, `indicador_id` and `anio` values remain `None` through CSV loading and the SQLite snapshot. Evaluation audit counts rows without a complete identity as invalid rather than inventing keys. | `domain/models.py`, `adapters/data/loaders.py`, `adapters/data/sqlite_snapshot.py`, `services/snapshot_audit.py` |
 | **Naming deviation** | `EventoGeoJSON` uses English field names (`magnitude`, `time`, `place`, ...) mirroring the USGS schema; they are snake_case but not Spanish (ADR-0009). | `domain/models.py` |
 | **Mock provider** | Returns a fixed draft but cites the first `<source_data id=...>` found in the prompt, so strict citation checks work offline. | `adapters/llm/mock_adapter.py` |
@@ -377,7 +378,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 - **SQLite Concurrency & WAL mode**: The SQLite adapter enforces `PRAGMA journal_mode=WAL;` and `PRAGMA busy_timeout=5000;` to ensure non-blocking concurrent operations between FastAPI requests and background ingestion.
 - **Fly.io Volume Mount**: On Fly.io, persistent volume `sentria_data` mounts to `/data`, configuring `SQLITE_DB_PATH=/data/copilot.db`.
 - **Recirculation (T03)** compares calendar dates with a threshold (`EventGrouper.RECIRCULATION_THRESHOLD_DAYS`), never raw timestamp strings.
-- **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, a draft with <100% citation coverage raises `ValueError` (HTTP 400).
+- **Generated drafts start in `EstadoRevision.EN_REVISION`**; only a human review call may move a case to `APROBADO_COMO_BORRADOR`. With `STRICT_CITATION_VERIFICATION=True`, structured factual claims that fail the ID, excerpt, or lexical checks are rejected (`ValueError`, HTTP 400); this does not establish semantic entailment or complete coverage of free-text claims.
 - **Sandboxed shells** may fail git with `unable to access ~/.gitconfig`; prefix with `GIT_CONFIG_GLOBAL=/dev/null` for read-only git commands.
 
 ---

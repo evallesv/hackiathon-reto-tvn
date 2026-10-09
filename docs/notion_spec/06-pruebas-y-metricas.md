@@ -40,13 +40,15 @@ Para evaluar de forma cuantitativa y reproducible el desempeño del copiloto fre
 El archivo contiene 60 consultas: 40 desarrollo y 20 reservadas. El endpoint ejecuta desarrollo. El conjunto reservado está dentro del repositorio, por lo que no es ciego ni constituye evaluación externa.
 
 ```
-En ejecución offline del 2026-10-09 sobre el snapshot SQLite sellado: P@5 recencia 0.000 (0/5) y fórmula P 0.400 (2/5). No se calcula mejora relativa porque la precisión baseline es cero.
+En ejecución offline del 2026-10-09 sobre `data/raw/` validado por manifiesto: P@5 recencia 0.200 (1/5) y fórmula P 0.400 (2/5), +100.0% relativo exploratorio.
 La relevancia se infiere con palabras clave; no equivale a una selección independiente de editor.
+
+En las 20 consultas sustentadas de desarrollo, el valor esperado principal y el ID de fuente coincidieron literalmente en 20/20 (100%). La medición no valida semántica y depende de etiquetas de desarrollo, no de adjudicación editorial independiente. El benchmark separa este valor del indicador de IDs resolubles.
 
 Contradicciones: diez pares sintéticos comparados entre regex y el adaptador de decisión configurado. En modo `mock`, Macro-F1 fue 0.792 para regex y 0.524 para el mock (`mock-clef-offline`). No representa desempeño de un modelo remoto ni una muestra editorial independiente.
 
-Citas/abstención: el evaluador comprueba que las respuestas sustentadas tengan IDs resolubles en el corpus y cuenta marcadores; no comprueba que cada afirmación esté citada ni el soporte semántico.
-Latencia: 2.1 ms de mediana en esta ejecución offline determinista; no representa un proveedor real.
+Citas/abstención: 20/20 respuestas sustentadas citaron IDs existentes; abstención y marcador adversarial se detectaron en todos los casos de prueba seleccionados. No comprueba que cada afirmación esté citada ni el soporte semántico.
+Latencia: 0.7 ms de mediana y 1.9 ms p95 en modo mock; no representa un proveedor real.
 ```
 
 ---
@@ -55,9 +57,9 @@ Latencia: 2.1 ms de mediana en esta ejecución offline determinista; no represen
 
 | Componente del Sistema | Baseline Clásico | Solución Copiloto IA (Sentria) | Impacto / Ganancia |
 | :--- | :--- | :--- | :--- |
-| **Ranking de Agenda (CU-01)** | Recencia sobre los mismos cinco casos. | Fórmula de atención sobre el mismo corpus. | Resultado exploratorio: 0/5 frente a 2/5; relevancia por keywords, no etiqueta editorial; mejora relativa no definida con baseline cero. |
+| **Ranking de Agenda (CU-01)** | Recencia sobre los mismos cinco casos. | Fórmula de atención sobre el mismo corpus congelado. | Resultado exploratorio: 1/5 frente a 2/5; relevancia por keywords, no etiqueta editorial; +100.0% relativo. |
 | **Contradicciones** | Regla regex sobre números y verbos de negación. | Predicciones consultando el adaptador de decisión configurado. | En modo mock, Macro-F1 0.792 frente a 0.524; diez pares sintéticos, no representa evaluación editorial independiente. |
-| **Citas y abstención** | No hay baseline. | Proporción de consultas sustentadas con IDs de fuente resolubles y recuento de marcadores. | No prueba que cada afirmación esté citada, el soporte semántico ni la ausencia de alucinaciones. |
+| **Citas y abstención** | No hay baseline. | IDs de fuente resolubles; coincidencia literal de valor + fuente esperados; recuento de marcadores. | 20/20 coincidencias literales en desarrollo. No prueba que cada afirmación esté citada, soporte semántico ni ausencia general de alucinaciones. |
 
 ---
 
@@ -72,6 +74,6 @@ uv run pytest tests/test_acceptance_t01_t10.py -v
 # Ejecutar el benchmark de desarrollo (40 consultas); no ejecuta las 20 etiquetas reservadas expuestas
 make benchmark
 
-# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 134 Tests de Pytest)
+# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 142 Tests de Pytest)
 make check
 ```

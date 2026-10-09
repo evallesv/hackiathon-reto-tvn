@@ -36,6 +36,6 @@ El reto establece requisitos no negociables de seguridad y ética:
 Una revisión del repositorio encontró que estas decisiones estaban definidas en `SafetyGuard` pero no se aplicaban en el flujo de borradores. Ahora:
 
 * `generate_tvn_editorial_package` serializa las afirmaciones del caso con `SafetyGuard.format_as_data_payload` (si `PROMPT_INJECTION_SHIELD_ENABLED`), y `format_as_data_payload` sanea también el título y neutraliza intentos de cerrar/falsificar las etiquetas de aislamiento.
-* Con `STRICT_CITATION_VERIFICATION=True`, un borrador con cobertura de citas < 100% se **rechaza** (`ValueError`, HTTP 400); antes solo se registraba una advertencia.
+* Con `STRICT_CITATION_VERIFICATION=True`, un borrador con afirmaciones factuales estructuradas que fallen la validación léxica de citas se **rechaza** (`ValueError`, HTTP 400). Esto no extrae todas las afirmaciones del texto libre ni prueba implicación semántica.
 * Un borrador generado deja el caso en `EstadoRevision.EN_REVISION`; la aprobación (`APROBADO_COMO_BORRADOR`) corresponde únicamente a una acción de revisión humana.
 * T03: la detección de recirculación compara fechas de calendario con umbral (`EventGrouper.RECIRCULATION_THRESHOLD_DAYS`) en vez de cadenas de timestamp crudas.

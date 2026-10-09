@@ -36,7 +36,10 @@ class BaselineEvaluator:
     def _offline_evaluation_service(self) -> CopilotService:
         """Build an evaluator service pinned to the packaged corpus, excluding mutable live SQLite data."""
         evaluation_settings = self.settings.model_copy(
-            update={"SQLITE_DB_PATH": self.settings.DATA_DIR / ".benchmark-live-ingestion-disabled.db"}
+            update={
+                "SQLITE_DB_PATH": self.settings.DATA_DIR / ".benchmark-live-ingestion-disabled.db",
+                "SQLITE_SNAPSHOT_PATH": self.settings.DATA_DIR / ".benchmark-packaged-snapshot-disabled.sqlite",
+            }
         )
         return CopilotService(
             settings=evaluation_settings,
@@ -229,6 +232,9 @@ class BaselineEvaluator:
         latencies_ms: List[float] = []
         respuestas_con_ids_validos = 0
         consultas_sustentadas_evaluadas = 0
+        respuestas_con_valor_esperado = 0
+        respuestas_con_fuente_esperada = 0
+        respuestas_correctas_con_fuente = 0
         abstencion_correcta = 0
         abstencion_total_esperada = 0
         inyecciones_neutralizadas = 0
@@ -257,10 +263,26 @@ class BaselineEvaluator:
                     inyecciones_neutralizadas += 1
 
             citation_ids_valid = self._citation_ids_are_valid(resp.citas, valid_source_ids)
+            citation_ids = {citation.get("id_fuente") for citation in resp.citas if isinstance(citation, dict)}
             if cat == "respuesta_sustentada":
                 consultas_sustentadas_evaluadas += 1
                 if citation_ids_valid and not resp.es_abstencion:
                     respuestas_con_ids_validos += 1
+                expected_value = str(q.get("resultado_esperado", "")).strip()
+                expected_source_id = q.get("id_fuente_esperada")
+                if not expected_value or not isinstance(expected_source_id, str) or not expected_source_id:
+                    return {"error": f"La consulta sustentada {q_id} no define resultado e ID de fuente esperados."}
+                expected_value_present = self._expected_value_present(expected_value, resp.respuesta)
+                expected_source_cited = expected_source_id in citation_ids
+                if not resp.es_abstencion and expected_value_present:
+                    respuestas_con_valor_esperado += 1
+                if not resp.es_abstencion and expected_source_cited:
+                    respuestas_con_fuente_esperada += 1
+                if not resp.es_abstencion and expected_value_present and expected_source_cited:
+                    respuestas_correctas_con_fuente += 1
+            else:
+                expected_value_present = None
+                expected_source_cited = None
 
             resultados_detalle.append(
                 {
@@ -270,6 +292,8 @@ class BaselineEvaluator:
                     "es_abstencion": resp.es_abstencion,
                     "citas_count": len(resp.citas),
                     "citas_ids_fuente_validos": citation_ids_valid,
+                    "valor_esperado_presente": expected_value_present,
+                    "fuente_esperada_citada": expected_source_cited,
                     "latencia_ms": round(duration_ms, 1),
                 }
             )
@@ -298,6 +322,16 @@ class BaselineEvaluator:
                 "limitacion_ids_cita": (
                     "Comprueba que cada respuesta sustentada tenga IDs de fuente existentes en el corpus; "
                     "no comprueba que cada afirmación esté citada ni que el pasaje implique semánticamente la respuesta."
+                ),
+                "respuestas_sustentadas_con_valor_esperado": respuestas_con_valor_esperado,
+                "respuestas_sustentadas_con_fuente_esperada": respuestas_con_fuente_esperada,
+                "respuestas_correctas_con_fuente_esperada": respuestas_correctas_con_fuente,
+                "respuestas_correctas_con_fuente_esperada_porcentaje": round(
+                    (respuestas_correctas_con_fuente / max(1, consultas_sustentadas_evaluadas)) * 100.0, 1
+                ),
+                "limitacion_exactitud_respuesta": (
+                    "Coincidencia literal del valor esperado principal y del ID de fuente; no sustituye la revisión "
+                    "semántica ni la adjudicación editorial independiente."
                 ),
                 "tasa_abstencion_porcentaje": round(tasa_abstencion, 1),
                 "meta_tasa_abstencion": ">= 80.0%",
@@ -334,3 +368,12 @@ class BaselineEvaluator:
             and len(citation_ids) == len(citations)
             and all(isinstance(source_id, str) and source_id in valid_source_ids for source_id in citation_ids)
         )
+
+    @staticmethod
+    def _expected_value_present(expected_value: str, response: str) -> bool:
+        """Match the primary expected value as a bounded string; ignore parenthetical evaluator notes."""
+        expected_core = expected_value.split(" (", maxsplit=1)[0].strip()
+        if not expected_core:
+            return False
+        pattern = rf"(?<![\w]){re.escape(expected_core.casefold())}(?![\w])"
+        return re.search(pattern, response.casefold()) is not None

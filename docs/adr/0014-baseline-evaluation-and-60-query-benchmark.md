@@ -47,9 +47,11 @@ Asimismo, el reto estipula una evaluación dividida entre un conjunto de desarro
 ## 4. Consecuencias y límites de la medición
 
 * Las cifras originales de **0.400/0.800 P@5**, **0.647/0.941 Macro-F1** y **+45.4%** no se reproducen y quedan retiradas.
-* Reejecución offline del 2026-10-09 sobre snapshot SQLite: P@5 0.000 (recencia, 0/5) frente a 0.400 (fórmula P, 2/5), exploratorio. La mejora relativa no se define con baseline cero.
+* Reejecución offline del 2026-10-09 sobre `data/raw/` y su manifiesto: P@5 0.200 (recencia, 1/5) frente a 0.400 (fórmula P, 2/5), mejora relativa +100.0%, exploratoria y basada en palabras clave.
+* En 20 consultas sustentadas de desarrollo, el adaptador mock coincidió literalmente con los 20 valores principales y los 20 IDs de fuente esperados. Es una comprobación de desarrollo reproducible, no una adjudicación independiente ni validación semántica.
 * En diez pares sintéticos con `mock-clef-offline`: Macro-F1 0.792 para regex y 0.524 para el adaptador; deben reportarse proveedor y modelo.
-* La tasa de IDs resolubles, abstención y latencia no acredita que cada afirmación esté citada, soporte semántico ni ausencia de alucinaciones.
+* Abstención explícita y marcador adversarial se detectaron en los casos de prueba seleccionados; latencia mediana mock 0.7 ms (p95 1.9 ms). Estos valores no representan proveedores reales ni garantizan ausencia general de alucinaciones.
+* La tasa de IDs resolubles no acredita que cada afirmación esté citada ni soporte semántico.
 * La API y `make benchmark` ejecutan solo desarrollo. Se rechaza la ejecución completa: las etiquetas reservadas están en el repositorio y no son ciegas; se necesita custodia externa para la evaluación del jurado.
 
 ---

@@ -10,7 +10,7 @@ El reto establece límites de extensión para los entregables de TVN: brief de h
 
 ## Decisión
 
-Validar de forma determinista los borradores después de generarlos y antes de calcular su cobertura de citas o guardarlos en la ficha. El conteo usa una función pura del dominio. Para el guion se configura un ritmo de 150 palabras por minuto: los 45–60 segundos corresponden a 113–150 palabras. Si un entregable viola un límite, el servicio lo rechaza y no cambia el estado de revisión ni persiste el borrador.
+Validar de forma determinista los borradores después de generarlos y antes de aplicar la validación léxica de citas sobre afirmaciones estructuradas o guardarlos en la ficha. El conteo usa una función pura del dominio. Para el guion se configura un ritmo de 150 palabras por minuto: los 45–60 segundos corresponden a 113–150 palabras. Si un entregable viola un límite, el servicio lo rechaza y no cambia el estado de revisión ni persiste el borrador.
 
 ## Consecuencias
 

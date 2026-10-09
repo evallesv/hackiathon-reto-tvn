@@ -675,6 +675,35 @@ document.addEventListener('DOMContentLoaded', () => {
             const model = contradictions.modelo_decision;
             elements.metricF1.textContent = model.f1.toFixed(3);
             elements.metricF1Target.textContent = `${model.provider}/${model.model}; muestra de ${model.muestra} pares sintéticos`;
+            document.getElementById('table-contradiction-model').textContent = model.f1.toFixed(3);
+            document.getElementById('table-contradiction-adapter').textContent = `${model.provider}/${model.model}`;
+        }
+        if (Number.isFinite(contradictions.baseline_regex?.f1)) {
+            const regexF1 = contradictions.baseline_regex.f1;
+            const modelF1 = contradictions.modelo_decision?.f1;
+            document.getElementById('table-contradiction-regex').textContent = regexF1.toFixed(3);
+            if (Number.isFinite(modelF1)) {
+                document.getElementById('table-contradiction-delta').textContent = `${(modelF1 - regexF1).toFixed(3)}`;
+            }
+        }
+        if (Number.isFinite(ranking.baseline_recencia?.precision_at_5) && Number.isFinite(ranking.copilot_score_p?.precision_at_5)) {
+            const baseline = ranking.baseline_recencia;
+            const copilot = ranking.copilot_score_p;
+            document.getElementById('table-p5-baseline').textContent = `${baseline.precision_at_5.toFixed(3)} (${baseline.casos_relevantes}/${baseline.total_evaluados})`;
+            document.getElementById('table-p5-copilot').textContent = `${copilot.precision_at_5.toFixed(3)} (${copilot.casos_relevantes}/${copilot.total_evaluados})`;
+            document.getElementById('table-p5-delta').textContent = (copilot.precision_at_5 - baseline.precision_at_5).toFixed(3);
+            document.getElementById('table-p5-relative').textContent = baseline.precision_at_5 === 0
+                ? 'N/D: baseline cero'
+                : `${(((copilot.precision_at_5 - baseline.precision_at_5) / baseline.precision_at_5) * 100).toFixed(1)}% (exploratorio)`;
+        }
+        if (Number.isFinite(summary.respuestas_sustentadas_con_ids_validos_porcentaje)) {
+            document.getElementById('table-citation-rate').textContent = `${summary.respuestas_sustentadas_con_ids_validos_porcentaje.toFixed(1)}%`;
+        }
+        if (Number.isFinite(summary.respuestas_correctas_con_fuente_esperada_porcentaje)) {
+            document.getElementById('table-answer-accuracy').textContent = (
+                `${summary.respuestas_correctas_con_fuente_esperada_porcentaje.toFixed(1)}% `
+                + `(${summary.respuestas_correctas_con_fuente_esperada}/${summary.consultas_sustentadas_evaluadas})`
+            );
         }
         if (Number.isFinite(summary.latencia_mediana_ms)) {
             elements.metricLatency.textContent = `${summary.latencia_mediana_ms.toFixed(1)} ms`;

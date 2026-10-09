@@ -307,24 +307,31 @@
                         <tbody>
                             <tr>
                                 <td><strong>Priorización de Agenda (CU-01)</strong></td>
-                                <td>Ordenamiento por recencia (P@5: <code>0.20 (1/5)</code>)</td>
-                                <td>Fórmula explicable P = 30R+25I+20U+15N+10E (P@5: <code>0.40 (2/5)</code>)</td>
-                                <td><span class="badge badge-success">+0.20</span></td>
-                                <td><strong>+100.0%, exploratorio</strong></td>
+                                <td>Recencia (P@5: <code id="table-p5-baseline">—</code>)</td>
+                                <td>Fórmula P (P@5: <code id="table-p5-copilot">—</code>)</td>
+                                <td><span class="badge" id="table-p5-delta">—</span></td>
+                                <td id="table-p5-relative">—</td>
                             </tr>
                             <tr>
                                 <td><strong>Detección de contradicciones, muestra sintética</strong></td>
-                                <td>Regex (Macro-F1 calculado en cada ejecución)</td>
-                                <td>Adaptador configurado (Macro-F1 calculado en cada ejecución)</td>
-                                <td><span class="badge">0.000</span></td>
-                                <td><strong>Sin mejora observada</strong></td>
+                                <td>Regex (Macro-F1: <code id="table-contradiction-regex">—</code>)</td>
+                                <td><span id="table-contradiction-adapter">Adaptador configurado</span> (Macro-F1: <code id="table-contradiction-model">—</code>)</td>
+                                <td><span class="badge" id="table-contradiction-delta">—</span></td>
+                                <td>Muestra sintética exploratoria</td>
                             </tr>
                             <tr>
-                                <td><strong>Presencia de IDs de cita</strong></td>
+                                <td><strong>Respuestas con IDs resolubles</strong></td>
                                 <td>Sin baseline medido</td>
-                                <td>100% en este evaluador; soporte semántico no medido</td>
+                                <td id="table-citation-rate">—</td>
                                 <td><span class="badge">No medido</span></td>
-                                <td><strong>No acredita cero alucinaciones</strong></td>
+                                <td>No mide soporte semántico</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Respuesta y fuente esperadas</strong></td>
+                                <td>Etiquetas del corpus congelado</td>
+                                <td id="table-answer-accuracy">—</td>
+                                <td><span class="badge">No aplica</span></td>
+                                <td>Coincidencia literal; revisión editorial pendiente</td>
                             </tr>
                         </tbody>
                     </table>

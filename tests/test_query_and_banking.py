@@ -35,6 +35,70 @@ async def test_query_world_bank_indicator_t04(copilot_service: CopilotService) -
     assert "PAN-NY.GDP.MKTP.KD.ZG-2023" in resp.citas[0]["id_fuente"]
 
 
+@pytest.mark.parametrize(
+    ("query", "expected_source"),
+    [
+        (
+            "¿Qué porcentaje de la población en Panamá utilizó internet en 2023?",
+            "PAN-IT.NET.USER.ZS-2023",
+        ),
+        (
+            "¿Cuál fue la proporción de exportaciones sobre el PIB de Panamá en 2023?",
+            "PAN-NE.EXP.GNFS.ZS-2023",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_query_prefers_explicit_indicator_over_context_words(
+    copilot_service: CopilotService, query: str, expected_source: str
+) -> None:
+    response = await copilot_service.answer_query_async(query)
+
+    assert response.es_abstencion is False
+    assert response.citas[0]["id_fuente"] == expected_source
+
+
+@pytest.mark.asyncio
+async def test_population_indicator_avoids_scientific_notation(copilot_service: CopilotService) -> None:
+    response = await copilot_service.answer_query_async(
+        "¿Cuál fue la población total estimada de Panamá en 2023 según datos oficiales?"
+    )
+
+    assert "4408581 habitantes" in response.respuesta
+    assert "e+" not in response.respuesta
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_text", "field"),
+    [
+        (
+            "¿Qué medio reportó inicialmente la reapertura del paso vehicular en el puente del interior?",
+            "TVN Noticias",
+            "medio",
+        ),
+        (
+            "¿Qué tema oficial se asignó a la noticia sobre el ajuste de calado del Canal?",
+            "logistica_canal",
+            "tema",
+        ),
+        (
+            "¿Cuál es el origen de extracción registrado para el comunicado de la Autoridad del Canal?",
+            "gdelt",
+            "origen",
+        ),
+    ],
+)
+@pytest.mark.asyncio
+async def test_query_resolves_news_metadata_from_corpus(
+    copilot_service: CopilotService, query: str, expected_text: str, field: str
+) -> None:
+    response = await copilot_service.answer_query_async(query)
+
+    assert response.es_abstencion is False
+    assert expected_text in response.respuesta
+    assert response.citas[0]["campo_o_pasaje"] == field
+
+
 @pytest.mark.asyncio
 async def test_replicated_news_does_not_count_as_independent_evidence(
     copilot_service: CopilotService, monkeypatch: pytest.MonkeyPatch

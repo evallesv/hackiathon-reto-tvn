@@ -63,7 +63,7 @@
 
 ### Minuto 6:30 – 8:00: Validación Científica y Resultados del Benchmark
 *(Hacer clic en la pestaña 'Métricas & Benchmark')*
-> *"Tenemos 40 consultas de desarrollo ejecutables. Las 20 etiquetas reservadas quedaron dentro del repositorio y no son ciegas, así que el runner las excluye y necesitamos custodia independiente para evaluar al jurado. En el snapshot SQLite local, P@5 fue 0 de 5 por recencia y 2 de 5 con la fórmula; son etiquetas por palabras clave, no una selección editorial independiente. En diez pares sintéticos, Macro-F1 fue 0.792 para regex y 0.524 para el adaptador mock. Las tasas estructurales de citas no verifican por sí solas el sustento semántico de cada oración."*
+> *"Tenemos 40 consultas de desarrollo ejecutables. Las 20 etiquetas reservadas quedaron dentro del repositorio y no son ciegas, así que el runner las excluye y necesitamos custodia independiente para evaluar al jurado. El benchmark corre sobre `data/raw/` verificado por manifiesto, separado del snapshot de demostración. Las 20 consultas sustentadas coincidieron con el valor principal y el ID de fuente esperados (20/20) bajo `mock`; es coincidencia literal del conjunto de desarrollo, no revisión semántica independiente. En P@5 obtuvimos 1 de 5 por recencia y 2 de 5 con la fórmula (+100% exploratorio, etiquetas por palabras clave). En diez pares sintéticos, Macro-F1 fue 0.792 para regex y 0.524 para el adaptador mock."*
 
 ---
 

@@ -688,18 +688,18 @@ class CopilotService:
                 break
 
         # Map indicator keywords
-        indicator_keyword_map = {
-            "pib": "NY.GDP.MKTP.KD.ZG",
-            "crecimiento": "NY.GDP.MKTP.KD.ZG",
-            "inflaci": "FP.CPI.TOTL.ZG",
-            "desempleo": "SL.UEM.TOTL.ZS",
-            "poblaci": "SP.POP.TOTL",
-            "habitantes": "SP.POP.TOTL",
-            "internet": "IT.NET.USER.ZS",
-            "exportaci": "NE.EXP.GNFS.ZS",
-        }
+        indicator_keyword_map = [
+            ("exportaci", "NE.EXP.GNFS.ZS"),
+            ("internet", "IT.NET.USER.ZS"),
+            ("inflaci", "FP.CPI.TOTL.ZG"),
+            ("desempleo", "SL.UEM.TOTL.ZS"),
+            ("habitantes", "SP.POP.TOTL"),
+            ("poblaci", "SP.POP.TOTL"),
+            ("crecimiento", "NY.GDP.MKTP.KD.ZG"),
+            ("pib", "NY.GDP.MKTP.KD.ZG"),
+        ]
         target_indicator = None
-        for kw, ind_id in indicator_keyword_map.items():
+        for kw, ind_id in indicator_keyword_map:
             if kw in q_lower:
                 target_indicator = ind_id
                 break
@@ -736,7 +736,11 @@ class CopilotService:
                     match.indicador_id or "", match.indicador_id or "indicador sin identificar"
                 )
                 unit_str = match.unidad if match.unidad != "personas" else " habitantes"
-                val_str = f"{match.valor:g}{unit_str}" if isinstance(match.valor, float) else f"{match.valor}{unit_str}"
+                if isinstance(match.valor, float):
+                    formatted_value = str(int(match.valor)) if match.valor.is_integer() else f"{match.valor:.15g}"
+                else:
+                    formatted_value = str(match.valor)
+                val_str = f"{formatted_value}{unit_str}"
                 return QueryResponse(
                     consulta=consulta,
                     respuesta=(
@@ -811,7 +815,15 @@ class CopilotService:
 
         # 6. Canal draft / calado
         noticias = self.load_query_news()
-        if "calado" in q_lower or "canal" in q_lower:
+        metadata_field = None
+        if re.search(r"\bmedio\b|\bquien publico\b|\bquién publicó\b", q_lower):
+            metadata_field = "medio"
+        elif re.search(r"\btema\b|\btem[aá]tica\b|\bcategor[ií]a\b", q_lower):
+            metadata_field = "tema"
+        elif re.search(r"\borigen\b|\bextracci[oó]n\b", q_lower):
+            metadata_field = "origen"
+
+        if ("calado" in q_lower or "canal" in q_lower) and metadata_field is None:
             year_match = re.search(r"\b(20\d{2})\b", q_lower)
             canal_news = [n for n in noticias if "calado" in n.titulo.lower()]
             n_canal = (
@@ -890,10 +902,42 @@ class CopilotService:
             "es",
         }
         significant_tokens = query_tokens - stop_words
+        if "autoridad" in q_lower and "canal" in q_lower:
+            significant_tokens.add("acp")
         matching_news = [n for n in noticias if any(t in n.titulo.lower() for t in significant_tokens)]
 
         if matching_news:
+            if metadata_field == "tema" and "calado" in q_lower:
+                anchored_news = [news for news in matching_news if "calado" in news.titulo.lower()]
+                if anchored_news:
+                    matching_news = anchored_news
+            elif metadata_field == "origen" and "autoridad" in q_lower:
+                # ACP is the source acronym used in headlines for the Canal Authority.
+                anchored_news = [news for news in matching_news if "acp" in news.titulo.lower()]
+                if anchored_news:
+                    matching_news = anchored_news
             lead = matching_news[0]
+            if metadata_field:
+                metadata_value = getattr(lead, metadata_field)
+                field_labels = {
+                    "medio": "Medio registrado",
+                    "tema": "Tema catalogado",
+                    "origen": "Origen de extracción",
+                }
+                return QueryResponse(
+                    consulta=consulta,
+                    respuesta=f"{field_labels[metadata_field]} para la noticia '{lead.titulo}': {metadata_value}.",
+                    es_abstencion=False,
+                    citas=[
+                        {
+                            "id_fuente": lead.id_noticia,
+                            "campo_o_pasaje": metadata_field,
+                            "texto_sustento": f"{field_labels[metadata_field]}: {metadata_value}",
+                            "url_fuente": lead.url,
+                        }
+                    ],
+                )
+
             citas = [
                 {
                     "id_fuente": lead.id_noticia,

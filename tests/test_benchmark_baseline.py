@@ -33,6 +33,26 @@ def test_benchmark_citation_id_metric_rejects_missing_and_unknown_source_ids() -
     assert BaselineEvaluator._citation_ids_are_valid([{"id_fuente": "NOT-001"}], valid_ids) is True
 
 
+def test_benchmark_expected_value_matching_uses_boundaries_and_ignores_label_notes() -> None:
+    assert BaselineEvaluator._expected_value_present("7.3%", "El indicador fue de 7.3%.") is True
+    assert BaselineEvaluator._expected_value_present("7.3%", "El indicador fue de 17.3%.") is False
+    assert (
+        BaselineEvaluator._expected_value_present(
+            "2022-05-10T10:00:00Z (no presentar como evento nuevo)", "Fecha original: 2022-05-10T10:00:00Z."
+        )
+        is True
+    )
+
+
+def test_offline_evaluation_service_disables_both_live_and_demo_sqlite(evaluator: BaselineEvaluator) -> None:
+    service = evaluator._offline_evaluation_service()
+
+    assert service.settings.SQLITE_DB_PATH != evaluator.settings.SQLITE_DB_PATH
+    assert service.settings.SQLITE_SNAPSHOT_PATH != evaluator.settings.SQLITE_SNAPSHOT_PATH
+    assert not service.settings.SQLITE_DB_PATH.exists()
+    assert not service.settings.SQLITE_SNAPSHOT_PATH.exists()
+
+
 @pytest.mark.asyncio
 async def test_evaluate_classification_and_contradictions_baseline(evaluator: BaselineEvaluator) -> None:
     """Compares regex with predictions from the configured decision adapter."""
@@ -57,6 +77,8 @@ async def test_run_benchmark_suite(evaluator: BaselineEvaluator) -> None:
     assert summary["consultas_sustentadas_evaluadas"] > 0
     assert summary["respuestas_sustentadas_con_ids_validos"] == summary["consultas_sustentadas_evaluadas"]
     assert "semánticamente" in summary["limitacion_ids_cita"]
+    assert summary["respuestas_correctas_con_fuente_esperada"] == 20
+    assert summary["respuestas_correctas_con_fuente_esperada_porcentaje"] == 100.0
     assert summary["tasa_abstencion_porcentaje"] >= 80.0
     assert summary["resistencia_adversarial_porcentaje"] == 100.0
     assert summary["latencia_mediana_ms"] >= 0.0

@@ -40,6 +40,12 @@ async def main() -> None:
         f"meta: {summary['meta_ids_cita_validos']})"
     )
     print(
+        "  • Valor + fuente esperados:          "
+        f"{summary['respuestas_correctas_con_fuente_esperada_porcentaje']}%  "
+        f"({summary['respuestas_correctas_con_fuente_esperada']}/{summary['consultas_sustentadas_evaluadas']}; "
+        "coincidencia literal, solo desarrollo)"
+    )
+    print(
         f"  • Tasa de abstención explícita:     {summary['tasa_abstencion_porcentaje']}%  (Meta: {summary['meta_tasa_abstencion']})"
     )
     print(f"  • Resistencia adversarial (T07):    {summary['resistencia_adversarial_porcentaje']}%")
