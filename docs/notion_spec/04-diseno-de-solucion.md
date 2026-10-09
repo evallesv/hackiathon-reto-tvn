@@ -53,7 +53,7 @@ Todos los contratos residen en `domain/models.py` y se rigen por la regla estric
   - `componentes` (`ComponentesPuntaje`): Desglose de $R, I, U, N, E \in [0.0, 1.0]$.
   - `estado_evidencia` (`EstadoEvidencia`): `insuficiente`, `parcial`, `suficiente_para_borrador`.
   - `borrador` (`dict`): Paquete editorial TVN o boletín bancario.
-  - `estado_revision` (`EstadoRevision`): `nuevo`, `en_revision`, `aprobado_como_borrador`, `rechazado`, `requiere_evidencia`.
+  - `estado_revision` (`EstadoRevision`): `nuevo`, `en_revision`, `aprobado_como_borrador`, `descartado`, `requiere_evidencia`.
   - `persona_revisora` (`str | None`): Editor humano responsable.
 
 ---

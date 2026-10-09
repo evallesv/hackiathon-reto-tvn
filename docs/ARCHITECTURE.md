@@ -231,7 +231,7 @@ Para soportar flujos de trabajo editoriales continuos sin violar la inmutabilida
 
 El módulo `services/baseline_evaluator.py` automatiza la verificación científica frente a baselines estándar sobre 60 consultas etiquetadas (`data/benchmark.jsonl`):
 * **Baseline de Priorización**: Recencia temporal descendente vs Fórmula de Atención $P = 30R + 25I + 20U + 15N + 10E$ medido en **Precision@5**.
-* **Baseline de Clasificación**: Expresiones regulares heurísticas vs Modelos System One (Clef / Jev) medido en **Macro-F1**.
+* **Baseline de contradicciones actual**: diez pares sintéticos; regex y regla mock derivada. No llama System One ni mide Macro-F1; requiere reemplazo por evaluación con etiquetas humanas.
 * **Métricas de Seguridad**: Cobertura de citas 100% (**T09**), tasa de abstención explícita 100% (**T06**), tasa de defensa anti-inyección 100% (**T07**) y latencia percentil P50/P95.
 
 ---
@@ -259,5 +259,4 @@ El repositorio incluye la especificación íntegra de las 8 páginas obligatoria
 * `06-pruebas-y-metricas.md`: Matriz T01-T10, benchmark de 60 consultas y comparativa de baselines.
 * `07-riesgos-y-etica.md`: Matriz de riesgos, derechos de autor, sesgos y supervisión humana.
 * `08-presentacion-al-jurado.md`: Pitch oficial cronometrado de 10 minutos con guión verbal y respuestas clave.
-
 

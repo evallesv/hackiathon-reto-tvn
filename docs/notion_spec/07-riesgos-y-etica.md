@@ -20,7 +20,7 @@ En concordancia con los estándares periodísticos de TVN Media y los principios
 
 | Riesgo Identificado | Severidad | Probabilidad | Medida de Mitigación Implementada | Verificación Técnica |
 | :--- | :---: | :---: | :--- | :--- |
-| **Alucinación de Cifras Económicas o Citas** | **Crítica** | Media | Protocolo de citación estricta y abstención canónica `[ABSTENCIÓN EXPLÍCITA]`. Prohibido inventar datos. | Test de Aceptación **T06** y **T09** (100% citas). |
+| **Alucinación de Cifras Económicas o Citas** | **Crítica** | Media | Protocolo de citación y abstención canónica `[ABSTENCIÓN EXPLÍCITA]`. La validación actual comprueba IDs de fuente; la pertinencia de la cita requiere revisión humana. | Test de Aceptación **T06** y revisión semántica pendiente para **T09**. |
 | **Manipulación por Prompt Injection** | **Alta** | Media | Todo texto externo se trata como dato no confiable en bloques aislados `<source_data>` y se sanitizan instrucciones de escape. | Test de Aceptación **T07** (100% neutralización). |
 | **Difusión de Noticias Recirculadas Antiguas** | **Alta** | Alta | Conservación de marcas de tiempo de publicación original y detección de brecha temporal superior a 30 días. | Test de Aceptación **T03** (Puente 2022). |
 | **Publicación Precipitada de Primicias sin Evidencia** | **Crítica** | Alta | Guardrail **T08**: si `estado_evidencia == INSUFICIENTE`, la generación y publicación quedan bloqueadas. | Test de Aceptación **T08** (Bloqueo de `CASO-005`). |

@@ -12,7 +12,7 @@
 | **0:00 – 1:30** (1.5 min) | **1. El Dolor en TVN Media** | Plantear el conflicto entre velocidad de primicia y rigor editorial; el peligro de las alucinaciones de la IA. | Diapositiva 1 / Dashboard Header |
 | **1:30 – 3:00** (1.5 min) | **2. Arquitectura de Decisión** | Explicar la Arquitectura Hexagonal y la segregación System One (Decisión rápida) vs System Two (LLM explicativo). | Diagrama C4 / Fórmula de Atención $P$ |
 | **3:00 – 6:30** (3.5 min) | **3. Demostración en Vivo** | Recorrido interactivo por las 4 vistas del dashboard: Agenda, Ficha, Consola del Jurado y Métricas. | **Dashboard Web en Vivo (`http://localhost:8080`)** |
-| **6:30 – 8:00** (1.5 min) | **4. Benchmark y Baselines** | Demostrar cuantitativamente que el sistema supera los baselines clásicos (+100% P@5, +45.4% F1). | Vista 4 / Gráficos de Evaluación |
+| **6:30 – 8:00** (1.5 min) | **4. Benchmark y Baselines** | Mostrar resultado exploratorio, baseline, tamaño de muestra y limitaciones; presentar resultados de IA solo si se verifican antes del pitch. | Vista 4 / Gráficos de Evaluación |
 | **8:00 – 9:00** (1.0 min) | **5. Ética y Guardrails** | Destacar el guardrail T08, anti-inyección T07 y supervisión humana obligatoria. | Guardrail Alert T08 / Modal de Revisión |
 | **9:00 – 10:00** (1.0 min) | **6. Impacto y Cierre** | Retorno de inversión para TVN Media, extensión bancaria y despliegue productivo. | Conclusión / Preguntas y Respuestas |
 
@@ -63,10 +63,7 @@
 
 ### Minuto 6:30 – 8:00: Validación Científica y Resultados del Benchmark
 *(Hacer clic en la pestaña 'Métricas & Benchmark')*
-> *"No nos quedamos en una demostración cualitativa. Evaluamos rigurosamente el sistema sobre **60 consultas evaluativas**:  
-> - Alcanzamos **100% de cobertura de citas**, **100% de abstención ante hechos no sustentados** y **100% de defensa anti-inyección**.  
-> - Frente al baseline clásico de ordenar noticias por recencia temporal, nuestra fórmula de atención logra una **mejora del +100% en Precision@5** (0.80 vs 0.40).  
-> - Y nuestro modelo System One supera a las heurísticas basadas en regex con una **mejora del +45.4% en Macro-F1** (0.941 vs 0.647), con una latencia de apenas 0.7 milisegundos."*
+> *"Tenemos un conjunto de 60 consultas con 40 de desarrollo y 20 reservadas; el conjunto reservado todavía requiere custodia independiente. En una medición exploratoria de cinco casos, la fórmula obtuvo 2 de 5 relevantes frente a 1 de 5 por recencia, con etiquetas por palabras clave. La prueba de contradicciones usa diez pares sintéticos y una regla mock: no muestra mejora frente a regex. Las tasas de citas cuentan IDs, no validan por sí solas que cada pasaje respalde una afirmación. Estamos cerrando esa evaluación antes de presentar resultados como desempeño de un modelo."*
 
 ---
 

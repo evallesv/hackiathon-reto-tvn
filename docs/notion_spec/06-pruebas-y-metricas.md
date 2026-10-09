@@ -35,36 +35,19 @@ Para evaluar de forma cuantitativa y reproducible el desempeño del copiloto fre
   - 10 consultas con hechos faltantes (para evaluar abstención estricta).
   - 10 consultas con intentos adversariales de inyección de prompt y fuga de instrucciones.
 
-### 2.1. Resultados del Benchmark (`data/benchmark_results.json`)
+### 2.1. Resultados locales exploratorios (2026-10-08)
+
+El archivo contiene 60 consultas: 40 desarrollo y 20 reservadas. El endpoint ejecuta desarrollo. El conjunto reservado está dentro del repositorio, por lo que no es ciego ni constituye evaluación externa.
 
 ```
-================================================================================
-TVN COPILOT BENCHMARK & BASELINE EVALUATION REPORT
-Total Queries Evaluated: 60 (Dev: 40, Jury: 20)
-Timestamp: 2026-10-07T08:15:23Z
-================================================================================
+P@5: recencia 0.200 (1/5); fórmula P 0.400 (2/5).
+La relevancia se infiere con palabras clave; no equivale a una selección independiente de editor.
 
-1. MÉTRICAS CLAVE DE SEGURIDAD Y VERIFICABILIDAD
-   - Cobertura de Citas (T09):                  100.0%  (Meta: 100%)
-   - Tasa de Abstención Explícita (T06):        100.0%  (Meta: 100%)
-   - Resistencia a Ataques Adversariales (T07): 100.0%  (Meta: 100%)
+Contradicciones: diez pares sintéticos. F1 de clase positiva 0.833 para regex y 0.833 para regla mock.
+No es macro-F1 y no evalúa System One.
 
-2. PRIORIZACIÓN DE AGENDA: ATTENTION SCORE P vs. RECENCIA TEMPORAL (P@5)
-   - Baseline Ingenuo (Recencia Temporal):      0.400   (2/5 relevantes)
-   - Copiloto TVN (Fórmula P = 30R+25I+...):    0.800   (4/5 relevantes)
-   - Delta Absoluto:                           +0.400
-   - MEJORA RELATIVA:                          +100.0%
-
-3. CLASIFICACIÓN DE ATENCIÓN SYSTEM ONE vs. REGEX HEURISTICS (MACRO-F1)
-   - Baseline Clásico (Regex Heuristics):       0.647
-   - System One Decision Model (Clef / Jev):    0.941
-   - Delta Absoluto:                           +0.294
-   - MEJORA RELATIVA:                           +45.4%
-
-4. RENDIMIENTO Y LATENCIA
-   - Latencia Mediana (P50):                    0.7 ms  (Offline Determinista)
-   - Latencia Percentil 95 (P95):               1.2 ms
-================================================================================
+Citas/abstención: el evaluador cuenta IDs o marcadores; no valida soporte semántico.
+Latencia: 0.7 ms de mediana en modo offline determinista; no representa un proveedor real.
 ```
 
 ---
@@ -73,9 +56,9 @@ Timestamp: 2026-10-07T08:15:23Z
 
 | Componente del Sistema | Baseline Clásico | Solución Copiloto IA (Sentria) | Impacto / Ganancia |
 | :--- | :--- | :--- | :--- |
-| **Ranking de Agenda (CU-01)** | Ordenar noticias por fecha de publicación descendente (Recency). | Fórmula multivariable ponderada $P = 30R + 25I + 20U + 15N + 10E$ con desempate por urgencia. | **+100.0% de precisión** en los 5 temas más relevantes para el noticiero. |
-| **Extracción de Señales (R, I, U, N, E)** | Reglas heurísticas basadas en conteo de palabras clave (`urgente`, `alerta`). | Modelo de clasificación System One (Cloudflare Clef / Jev) entrenado para inferencia de señales. | **+45.4% de Macro-F1** (0.941 vs 0.647), eliminando falsos positivos. |
-| **Generación de Respuestas** | LLM comercial sin restricciones (alucinación de datos macroeconómicos). | Síntesis estricta acotada al corpus con abstención obligatoria `[ABSTENCIÓN EXPLÍCITA]` si no hay datos. | **0% de alucinaciones** y 100% de citas verificables hacia la fuente original. |
+| **Ranking de Agenda (CU-01)** | Recencia sobre cinco casos. | Fórmula de atención sobre el mismo corpus. | Resultado exploratorio: 1/5 frente a 2/5; relevancia por keywords, no etiqueta editorial. |
+| **Contradicciones** | Regla regex. | Regla mock derivada de la misma regla. | F1 positivo 0.833 en ambos sobre diez pares sintéticos; no mide System One. |
+| **Citas y abstención** | No hay baseline. | Recuento de IDs y marcadores de salida. | No mide soporte semántico ni demuestra ausencia de alucinaciones. |
 
 ---
 

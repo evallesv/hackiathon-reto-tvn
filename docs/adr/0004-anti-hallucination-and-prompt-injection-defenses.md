@@ -29,7 +29,7 @@ El reto establece requisitos no negociables de seguridad y ética:
 ### Positivas
 * Resistencia a ataques de inyección indirecta provenientes de fuentes públicas (T07).
 * Prevención sistemática de alucinaciones (T06).
-* Garantía verificable del 100% de citas en el benchmark de evaluación.
+* El validador comprueba que las citas apunten a IDs de fuente permitidos; esto no demuestra que el pasaje respalde semánticamente la afirmación. No hay aún una métrica verificada de sustento semántico en el benchmark.
 
 ## Addendum (2026-10-06): aplicación efectiva en `CopilotService`
 

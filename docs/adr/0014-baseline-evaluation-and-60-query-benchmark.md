@@ -1,6 +1,6 @@
 # ADR-0014: Evaluador de Baselines y Benchmark Formal de 60 Consultas
 
-* **Estado**: Aceptado
+* **Estado**: Revisado; métricas iniciales invalidadas por auditoría local (2026-10-08)
 * **Fecha**: 2026-10-07
 * **Área**: Evaluación, Métricas y Benchmark Científico
 
@@ -33,10 +33,10 @@ Asimismo, el reto estipula una evaluación dividida entre un conjunto de desarro
 1. **Dataset de 60 Consultas Etiquetadas (`data/benchmark.jsonl`)**:
    - 40 consultas de desarrollo (`dev`) y 20 consultas ciegas del jurado (`jury`).
    - 4 tipologías: 30 consultas soportadas con hechos en el corpus, 10 de contradicción factual, 10 de hechos faltantes (para evaluar abstención estricta) y 10 ataques adversariales de prompt injection.
-2. **Evaluador de Baselines (`services/baseline_evaluator.py`)**:
-   - *Priorización*: Calcula Precision@5 comparando el top-5 del orden cronológico vs el top-5 de la fórmula $P = 30R + 25I + 20U + 15N + 10E$.
-   - *Clasificación System One*: Evalúa Macro-F1 comparando un clasificador de expresiones regulares vs el modelo de decisión System One (Clef / Jev).
-   - *Seguridad*: Valida el ratio de respuestas con cita válida ($\ge 1$ `id_fuente`), el ratio de respuestas que emiten `[ABSTENCIÓN EXPLÍCITA]` cuando no hay hechos, y la tasa de neutralización de inyecciones.
+2. **Evaluador actual (`services/baseline_evaluator.py`)**:
+   - *Priorización*: estima Precision@5 con etiquetas por palabras clave; carece de relevancia editorial independiente.
+   - *Contradicciones*: usa la misma regla regex para ambas predicciones con una excepción textual; no llama a System One. El F1 es de clase positiva, no macro-F1.
+   - *Seguridad*: cuenta IDs y marcadores de respuesta; no mide soporte semántico ni resistencia general.
 3. **Caché y Exposición de Resultados**:
    - Almacenamiento en `data/benchmark_results.json`.
    - Endpoint REST `GET /api/v1/copilot/benchmark/metrics`.
@@ -44,19 +44,18 @@ Asimismo, el reto estipula una evaluación dividida entre un conjunto de desarro
 
 ---
 
-## 4. Consecuencias y Métricas Obtenidas
+## 4. Consecuencias y límites de la medición
 
-* **Precision@5**: 0.400 (Recencia) vs 0.800 (Fórmula $P$) &rarr; **+100.0% de mejora relativa**.
-* **Macro-F1**: 0.647 (Regex) vs 0.941 (System One) &rarr; **+45.4% de mejora relativa**.
-* **Cobertura de Citas (T09)**: **100.0%** (0 alucinaciones fácticas).
-* **Tasa de Abstención Explícita (T06)**: **100.0%** de cumplimiento.
-* **Defensa Anti-Inyección (T07)**: **100.0%** de contención en `<source_data>`.
-* **Latencia Mediana P50**: **0.7 ms** (modo offline determinista).
+* Las cifras originales de **0.400/0.800 P@5**, **0.647/0.941 Macro-F1** y **+45.4%** no se reproducen y quedan retiradas.
+* Reejecución offline del 2026-10-08: P@5 0.200 (recencia, 1/5) frente a 0.400 (fórmula P, 2/5), exploratorio.
+* En diez pares sintéticos, F1 de clase positiva: 0.833 para regex y 0.833 para la regla mock. No evalúa un modelo real.
+* Las tasas estructurales de citas, abstención y latencia no acreditan soporte semántico ni ausencia de alucinaciones.
+* La API ejecuta desarrollo. El reservado está en el repositorio y no es ciego.
 
 ---
 
 ## 5. Conformidad con el Reto
 
-* Cumple la Sección 8 (Métricas de evaluación y comparación formal de baselines).
-* Cumple la Sección 9.1 (Conjuntos dev y test/jury diferenciados).
-* Garantiza reproducibilidad offline conforme al criterio de contingencia **T10**.
+* El runner permite medir el conjunto de desarrollo offline; no demuestra todavía una mejora de IA.
+* La evaluación reservada requiere custodia y respuestas que no se usen para ajustar prompts o reglas.
+* Una nueva medición debe guardar etiquetas humanas, salidas, commit, corpus y modo de ejecución.

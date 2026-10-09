@@ -37,11 +37,12 @@ La solución transforma un corpus público congelado (RSS TVN, GDELT, Banco Mund
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
    - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
-6. **Benchmark Formal de 60 Consultas y Comparativa de Baselines**:
-   - Evaluación cuantitativa sobre 60 consultas etiquetadas (40 dev / 20 jurado) en `data/benchmark.jsonl`.
-   - **Precision@5**: Mejora relativa de **+100.0%** (0.800 vs 0.400) frente al baseline clásico de recencia temporal.
-   - **Macro-F1**: Mejora de **+45.4%** (0.941 vs 0.647) de System One frente a heurísticas regex.
-   - 100% de cobertura de citas, 100% de abstención explícita y latencia mediana de **0.7 ms** en modo determinista.
+6. **Benchmark reproducible en desarrollo**:
+   - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
+   - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
+   - La medición local exploratoria obtuvo P@5 de **0.20 (1/5)** por recencia y **0.40 (2/5)** con la fórmula de atención. Las etiquetas se basan en palabras clave y no son una evaluación editorial independiente.
+   - La evaluación de contradicciones usa una regla mock y diez pares sintéticos: ambos métodos obtuvieron F1 de clase positiva **0.833**. No es macro-F1 ni mide el desempeño de un modelo real.
+   - Las tasas de cita y abstención miden condiciones estructurales de respuestas seleccionadas; no verifican sustento semántico ni demuestran ausencia de alucinaciones.
 7. **Extensión Modular para Sector Banca (CU-05)**:
    - Generación de boletines de entorno macroeconómico y logístico (PIB, inflación, embalses del Canal de Panamá) para comités de riesgo sectorial, preservando las series exactas del Banco Mundial (**T04**).
 8. **Persistencia Transaccional SQLite WAL y Flujo Human-in-the-Loop**:
@@ -320,7 +321,6 @@ El espacio oficial de Notion Business contiene las **8 páginas obligatorias** d
 | **03** | **Catálogo de datos** | 4 fuentes, licencias (CC BY 4.0, TVN, USGS), nulos y hashes SHA-256. | [`03-catalogo-de-datos.md`](docs/notion_spec/03-catalogo-de-datos.md) |
 | **04** | **Diseño de solución** | Arquitectura Hexagonal, Pydantic, fórmula $P$, prompts seguros y límites. | [`04-diseno-de-solucion.md`](docs/notion_spec/04-diseno-de-solucion.md) |
 | **05** | **Casos y evidencias** | 5 fichas canónicas, citas 100%, brief TVN, banca y alerta Guardrail T08. | [`05-casos-y-evidencias.md`](docs/notion_spec/05-casos-y-evidencias.md) |
-| **06** | **Pruebas y métricas** | Matriz T01-T10, benchmark de 60 consultas y mejoras (+100% P@5, +45.4% F1). | [`06-pruebas-y-metricas.md`](docs/notion_spec/06-pruebas-y-metricas.md) |
+| **06** | **Pruebas y métricas** | Matriz T01-T10 y benchmark en desarrollo; resultados exploratorios y límites documentados. | [`06-pruebas-y-metricas.md`](docs/notion_spec/06-pruebas-y-metricas.md) |
 | **07** | **Riesgos y ética** | Matriz de riesgos, derechos de autor, anti-inyección y reserva humana. | [`07-riesgos-y-etica.md`](docs/notion_spec/07-riesgos-y-etica.md) |
 | **08** | **Presentación al jurado** | Pitch cronometrado de 10 minutos, guión para el expositor y respuestas clave. | [`08-presentacion-al-jurado.md`](docs/notion_spec/08-presentacion-al-jurado.md) |
-

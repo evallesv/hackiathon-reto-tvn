@@ -52,14 +52,12 @@
 
 ---
 
-## 5. Criterios de Éxito del Proyecto (KPIs Oficiales)
+## 5. Criterios de Aceptación y Metas del Proyecto
 
-1. **100% de Cobertura de Citas (T09)**: Toda afirmación fáctica generada en un borrador está vinculada a un ID de fuente verificado.
-2. **100% de Tasa de Abstención Explícita (T06)**: Si el corpus no contiene evidencia, el sistema responde `[ABSTENCIÓN EXPLÍCITA]` sin inventar.
-3. **100% de Neutralización de Inyecciones de Prompt (T07)**: Los textos de fuentes externas se tratan como datos no confiables dentro de bloques `<source_data>`.
-4. **Mejora Significativa sobre Baselines**:
-   - Priorización: Mejora de al menos +50% en Precision@5 frente a la recencia temporal ingenua (logrado: **+100.0%**).
-   - Clasificación: Macro-F1 de System One superior a heurísticas de expresiones regulares (logrado: **0.941 vs 0.647, +45.4%**).
+1. **Trazabilidad de citas (T09)**: La meta es que toda afirmación factual cite una fuente pertinente. El validador actual comprueba presencia de IDs permitidos, no sustento semántico; la validez debe medirse mediante revisión humana.
+2. **Abstención (T06)**: La meta es abstenerse cuando el corpus no contiene evidencia. Las pruebas de aceptación verifican escenarios controlados; no representan por sí solas una tasa general de desempeño.
+3. **Tratamiento de fuentes no confiables (T07)**: El contenido externo debe permanecer como dato dentro de bloques `<source_data>` y no alterar instrucciones.
+4. **Comparación con baselines**: resultado exploratorio; no se afirma una mejora general. La clasificación actual usa reglas mock y no demuestra una mejora de un modelo real.
 5. **Operabilidad 100% Offline y Determinista (T10)**: Demostración y suite de pruebas ejecutables sin internet ni tokens de pago.
 6. **Despliegue Productivo Continuo**: Despliegue en la nube mediante Fly.io con persistencia SQLite WAL y binding en `0.0.0.0:8080`.
 
