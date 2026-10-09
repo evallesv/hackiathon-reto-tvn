@@ -151,16 +151,18 @@ class LiveDataFetcher:
                     if not url or not title:
                         continue
 
-                    # Parse GDELT seendate format YYYYMMDDTHHMMSSZ
+                    # GDELT seendate is discovery time, not the article's publication time.
                     seen_date_raw = art.get("seendate")
                     if seen_date_raw:
                         try:
-                            dt = datetime.strptime(seen_date_raw, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
-                            iso_date = dt.isoformat()
+                            detected_at = datetime.strptime(seen_date_raw, "%Y%m%dT%H%M%SZ").replace(
+                                tzinfo=timezone.utc
+                            )
+                            detected_at_iso = detected_at.isoformat()
                         except ValueError:
-                            iso_date = now_utc
+                            detected_at_iso = now_utc
                     else:
-                        iso_date = now_utc
+                        detected_at_iso = now_utc
 
                     domain = art.get("domain", "GDELT Source")
                     records.append(
@@ -170,8 +172,8 @@ class LiveDataFetcher:
                             "url": url,
                             "medio": domain,
                             "idioma": art.get("language", "es"),
-                            "fecha_publicacion": iso_date,
-                            "fecha_deteccion": now_utc,
+                            "fecha_publicacion": "",
+                            "fecha_deteccion": detected_at_iso,
                             "fecha_extraccion": now_utc,
                             "tema": "economia_logistica",
                             "origen": "gdelt",

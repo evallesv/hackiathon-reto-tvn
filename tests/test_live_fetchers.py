@@ -13,6 +13,45 @@ from hackiathon_reto_tvn.adapters.data.live_fetchers import (
 from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 
 
+@pytest.mark.asyncio
+async def test_gdelt_seendate_is_detection_time_not_publication_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = '{"articles": [{"url": "https://example.com/article", "title": "Titular", "seendate": "20240311T104500Z", "domain": "example.com"}]}'
+
+        def json(self) -> dict[str, list[dict[str, str]]]:
+            return {
+                "articles": [
+                    {
+                        "url": "https://example.com/article",
+                        "title": "Titular",
+                        "seendate": "20240311T104500Z",
+                        "domain": "example.com",
+                    }
+                ]
+            }
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    [article] = await LiveDataFetcher().fetch_gdelt()
+
+    assert article["fecha_publicacion"] == ""
+    assert article["fecha_deteccion"].startswith("2024-03-11T10:45:00")
+
+
 def test_date_parsing_and_id_generation() -> None:
     # RFC 822
     rfc = "Tue, 06 Oct 2026 23:57:05 +0000"

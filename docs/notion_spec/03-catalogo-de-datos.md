@@ -29,6 +29,7 @@ El sistema integra 4 orígenes de información heterogéneos, categorizados en d
   - `idioma` (`TEXT`): Código ISO `es`.
   - `fecha_publicacion` (`TEXT ISO8601`): Fecha oficial declarada de emisión.
   - `fecha_deteccion` (`TEXT ISO8601`): Marca temporal de captura en el sistema.
+  - **GDELT**: `seendate` se conserva como `fecha_deteccion`; no se usa como fecha de publicación. Si no se verifica por separado, `fecha_publicacion` queda vacía.
   - `fecha_extraccion` (`TEXT ISO8601`): Fecha de procesamiento por el loader.
   - `tema` (`TEXT`): Categoría temática (`infraestructura`, `logistica`, `salud`, `clima`).
   - `origen` (`TEXT`): Origen técnico (`tvn_rss`, `gdelt`, etc.).
