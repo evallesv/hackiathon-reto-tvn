@@ -60,6 +60,9 @@ benchmark:
 audit-snapshot:
 	uv run python scripts/audit_snapshot.py --data-dir "$(SNAPSHOT_DIR)"
 
+prepare-snapshot:
+	uv run python scripts/prepare_snapshot.py --output-dir "$(SNAPSHOT_DIR)"
+
 check: lint format-check typecheck test
 
 run:

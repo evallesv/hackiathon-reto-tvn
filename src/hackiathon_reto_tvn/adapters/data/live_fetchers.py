@@ -117,10 +117,22 @@ class LiveDataFetcher:
         self,
         query: str = "panama (logistica OR turismo OR economia)",
         max_records: int = 30,
+        start_datetime: str | None = None,
+        end_datetime: str | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch recent Panama news articles from GDELT DOC 2.0 API."""
         encoded_query = urllib.parse.quote(query)
-        gdelt_url = f"https://api.gdeltproject.org/api/v2/doc/doc?query={encoded_query}&mode=artlist&maxrecords={max_records}&format=json"
+        date_params = ""
+        if start_datetime:
+            datetime.strptime(start_datetime, "%Y%m%d%H%M%S")
+            date_params += f"&startdatetime={start_datetime}"
+        if end_datetime:
+            datetime.strptime(end_datetime, "%Y%m%d%H%M%S")
+            date_params += f"&enddatetime={end_datetime}"
+        gdelt_url = (
+            f"https://api.gdeltproject.org/api/v2/doc/doc?query={encoded_query}"
+            f"&mode=artlist&maxrecords={max_records}&format=json{date_params}"
+        )
         logger.info(f"Fetching GDELT articles: {gdelt_url}")
 
         records: list[dict[str, Any]] = []
@@ -196,6 +208,8 @@ class LiveDataFetcher:
         self,
         countries: list[str] | None = None,
         indicators: list[str] | None = None,
+        start_year: int = 2021,
+        end_year: int = 2024,
     ) -> list[dict[str, Any]]:
         """Fetch macro indicators from the World Bank API."""
         target_countries = countries or ["PAN", "CRI", "COL", "DOM", "MEX", "GTM"]
@@ -216,7 +230,10 @@ class LiveDataFetcher:
         ) as client:
             for country in target_countries:
                 for indicator in target_indicators:
-                    url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?date=2021:2024&format=json"
+                    url = (
+                        f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
+                        f"?date={start_year}:{end_year}&format=json"
+                    )
                     try:
                         resp = await client.get(url)
                         if resp.status_code != 200:
@@ -239,7 +256,13 @@ class LiveDataFetcher:
                                         "indicador_id": indicator,
                                         "anio": int(date_year),
                                         "valor": float(val) if val is not None else None,
-                                        "unidad": "%" if "ZG" in indicator or "ZS" in indicator else "unidad",
+                                        "unidad": (
+                                            "personas"
+                                            if indicator == "SP.POP.TOTL"
+                                            else "%"
+                                            if "ZG" in indicator or "ZS" in indicator
+                                            else "unidad"
+                                        ),
                                         "fuente_url": url,
                                         "fecha_extraccion": now_utc,
                                         "licencia": "CC BY 4.0 (Banco Mundial)",
@@ -256,6 +279,8 @@ class LiveDataFetcher:
         min_magnitude: float = 3.0,
         bbox: tuple[float, float, float, float] = (5.0, 12.0, -86.0, -76.0),
         limit: int = 30,
+        start_time: str | None = None,
+        end_time: str | None = None,
     ) -> list[dict[str, Any]]:
         """Fetch seismic events in the Panama region box from USGS GeoJSON API."""
         min_lat, max_lat, min_lon, max_lon = bbox
@@ -266,6 +291,12 @@ class LiveDataFetcher:
             f"&minlongitude={min_lon}&maxlongitude={max_lon}"
             f"&limit={limit}"
         )
+        if start_time:
+            datetime.strptime(start_time, "%Y-%m-%d")
+            url += f"&starttime={start_time}"
+        if end_time:
+            datetime.strptime(end_time, "%Y-%m-%d")
+            url += f"&endtime={end_time}"
         logger.info(f"Fetching USGS seismic events: {url}")
 
         records: list[dict[str, Any]] = []

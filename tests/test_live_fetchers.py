@@ -15,6 +15,8 @@ from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 
 @pytest.mark.asyncio
 async def test_gdelt_seendate_is_detection_time_not_publication_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested_urls: list[str] = []
+
     class Response:
         status_code = 200
         headers = {"content-type": "application/json"}
@@ -40,16 +42,88 @@ async def test_gdelt_seendate_is_detection_time_not_publication_time(monkeypatch
             return None
 
         async def get(self, url: str) -> Response:
+            requested_urls.append(url)
             return Response()
 
     monkeypatch.setattr(
         "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
     )
 
-    [article] = await LiveDataFetcher().fetch_gdelt()
+    [article] = await LiveDataFetcher().fetch_gdelt(start_datetime="20260801000000", end_datetime="20261001000000")
 
     assert article["fecha_publicacion"] == ""
     assert article["fecha_deteccion"].startswith("2024-03-11T10:45:00")
+    assert "startdatetime=20260801000000" in requested_urls[0]
+    assert "enddatetime=20261001000000" in requested_urls[0]
+
+
+@pytest.mark.asyncio
+async def test_world_bank_fetch_accepts_full_challenge_year_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested_urls: list[str] = []
+
+    class Response:
+        status_code = 200
+
+        def json(self) -> list[object]:
+            return [{}, [{"date": "2010", "value": None}]]
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            requested_urls.append(url)
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    records = await LiveDataFetcher().fetch_world_bank(
+        countries=["PAN"], indicators=["NY.GDP.MKTP.KD.ZG"], start_year=2010, end_year=2024
+    )
+
+    assert len(records) == 1
+    assert records[0]["anio"] == 2010
+    assert records[0]["valor"] is None
+    assert "date=2010:2024" in requested_urls[0]
+
+
+@pytest.mark.asyncio
+async def test_usgs_fetch_accepts_challenge_period(monkeypatch: pytest.MonkeyPatch) -> None:
+    requested_urls: list[str] = []
+
+    class Response:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, list[object]]:
+            return {"features": []}
+
+    class AsyncClient:
+        async def __aenter__(self) -> "AsyncClient":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def get(self, url: str) -> Response:
+            requested_urls.append(url)
+            return Response()
+
+    monkeypatch.setattr(
+        "hackiathon_reto_tvn.adapters.data.live_fetchers.httpx.AsyncClient", lambda **kwargs: AsyncClient()
+    )
+
+    await LiveDataFetcher().fetch_usgs(start_time="2024-01-01", end_time="2025-01-01")
+
+    assert "starttime=2024-01-01" in requested_urls[0]
+    assert "endtime=2025-01-01" in requested_urls[0]
 
 
 def test_date_parsing_and_id_generation() -> None:
