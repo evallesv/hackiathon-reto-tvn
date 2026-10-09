@@ -38,6 +38,7 @@ La solución combina un corpus público congelado (para evaluación reproducible
    - Cero dependencias pesadas de npm (HTML5, Vanilla CSS Dark Glassmorphic, Javascript reactivo).
    - 4 Vistas en vivo: 1) Agenda Priorizada con desglose de fórmula $P$ y alerta T08; 2) Fichas de Evidencia con brief (250 palabras), guion (45-60s), copy digital (80 palabras), extensión bancaria y controles de revisión humana; 3) Consola Interactiva del Jurado con botones de prueba inmediata (T04, T05, T06, T07, USGS) y consulta libre; 4) Métricas formales de benchmark y verificador de integridad SHA-256.
    - La agenda y las consultas usan primero noticias recientes persistidas en SQLite (ventana retrospectiva configurable `LIVE_AGENDA_MAX_AGE_DAYS`, 90 días por defecto), además de conservar el snapshot para preguntas históricas. Indicadores y eventos vivos se combinan por sus claves con las series congeladas. Si no hay noticia reciente, la agenda identifica claramente el respaldo histórico; el entorno de pruebas sigue usando solo el snapshot.
+   - `data/snapshot/snapshot.sqlite` empaqueta el corpus congelado y, cuando existe, noticias recientes, indicadores y eventos de la base local. La copia se abre en modo de solo lectura, incluye su manifiesto/hash y excluye revisiones editoriales y bitácoras de ingesta. `make sqlite-snapshot` la genera sin modificar `data/raw/` ni `data/manifest.json`.
 6. **Benchmark reproducible en desarrollo**:
    - `data/benchmark.jsonl` contiene 60 consultas: 40 de desarrollo y 20 reservadas.
    - La API ejecuta el conjunto de desarrollo (40); el conjunto reservado no está aislado del repositorio y no se presenta como evaluación ciega.
@@ -83,6 +84,7 @@ hackiathon-reto-tvn/
 │   └── main.py                      # Punto de entrada ASGI con lifespan worker, rutas estáticas y server
 ├── data/
 │   ├── raw/                         # noticias.csv, indicadores.csv, eventos.geojson (congelado)
+│   ├── snapshot/                    # snapshot.sqlite y manifiesto del paquete offline de consulta
 │   ├── benchmark.jsonl              # 60 consultas etiquetadas de evaluación (40 dev / 20 jurado)
 │   ├── benchmark_results.json       # Resultados cacheados del benchmark y comparación de baselines
 │   ├── fichas.jsonl                 # 5 fichas canónicas iniciales (incluye caso de alerta T08)
@@ -205,6 +207,9 @@ uv run hackiathon-server
 
 # Ejecutar el benchmark formal de 60 consultas frente a baselines
 make benchmark
+
+# Crear el paquete SQLite offline desde el corpus y la ingesta local disponible
+make sqlite-snapshot
 
 # Generar o verificar manifiesto criptográfico SHA-256
 make manifest

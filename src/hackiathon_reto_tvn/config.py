@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     PROCESSED_DATA_DIR: Path = Path("data/processed")
     BENCHMARK_PATH: Path = Path("data/benchmark.jsonl")
     MANIFEST_PATH: Path = Path("data/manifest.json")
+    SQLITE_SNAPSHOT_PATH: Path = Field(
+        default=Path("data/snapshot/snapshot.sqlite"),
+        description="Ruta al snapshot SQLite local, de solo lectura, del corpus congelado",
+    )
 
     # Storage & SQLite Database
     SQLITE_DB_PATH: Path = Field(

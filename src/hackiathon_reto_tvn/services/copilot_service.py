@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from hackiathon_reto_tvn.adapters.data.loaders import EventGrouper, LocalStorageRepository
+from hackiathon_reto_tvn.adapters.data.sqlite_snapshot import SQLiteSnapshotRepository
 from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 from hackiathon_reto_tvn.adapters.decision.factory import get_decision_client
 from hackiathon_reto_tvn.adapters.llm.factory import get_llm_client
@@ -60,10 +61,24 @@ class CopilotService:
         self.repo = repository or LocalStorageRepository()
 
     def load_corpus(self) -> Tuple[List[Noticia], int]:
-        """Loads noticias.csv, returns loaded items and count."""
+        """Loads the verified frozen SQLite snapshot, falling back to its raw-file inputs."""
+        snapshot = self._get_frozen_snapshot()
+        if snapshot is not None:
+            noticias = snapshot.load_noticias()
+            return noticias, len(noticias)
         path = self.settings.RAW_DATA_DIR / "noticias.csv"
         noticias = self.repo.load_noticias(path)
         return noticias, len(noticias)
+
+    def _get_frozen_snapshot(self) -> Optional[SQLiteSnapshotRepository]:
+        """Return a snapshot only when its hashes match the current source manifest."""
+        if self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_SNAPSHOT_PATH.exists():
+            return None
+        snapshot = SQLiteSnapshotRepository(self.settings.SQLITE_SNAPSHOT_PATH)
+        if not snapshot.is_valid_for_manifest(self.settings.MANIFEST_PATH):
+            logger.warning("El snapshot SQLite no coincide con el manifiesto; se usarán los archivos congelados.")
+            return None
+        return snapshot
 
     @staticmethod
     def _parse_source_datetime(value: str) -> Optional[datetime]:
@@ -125,7 +140,12 @@ class CopilotService:
 
     def load_query_indicators(self) -> List[Indicador]:
         """Merge live indicator observations over the frozen history by country, series, and year."""
-        indicators = self.repo.load_indicadores(self.settings.RAW_DATA_DIR / "indicadores.csv")
+        snapshot = self._get_frozen_snapshot()
+        indicators = (
+            snapshot.load_indicadores()
+            if snapshot is not None
+            else self.repo.load_indicadores(self.settings.RAW_DATA_DIR / "indicadores.csv")
+        )
         if self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_DB_PATH.exists():
             return indicators
         try:
@@ -141,7 +161,12 @@ class CopilotService:
 
     def load_query_events(self) -> List[EventoGeoJSON]:
         """Merge live USGS events with the frozen regional catalog by event ID."""
-        events = self.repo.load_eventos(self.settings.RAW_DATA_DIR / "eventos.geojson")
+        snapshot = self._get_frozen_snapshot()
+        events = (
+            snapshot.load_eventos()
+            if snapshot is not None
+            else self.repo.load_eventos(self.settings.RAW_DATA_DIR / "eventos.geojson")
+        )
         if self.settings.ENVIRONMENT == "test" or not self.settings.SQLITE_DB_PATH.exists():
             return events
         try:

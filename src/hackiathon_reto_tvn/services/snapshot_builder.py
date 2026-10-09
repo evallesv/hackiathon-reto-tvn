@@ -11,7 +11,9 @@ from typing import Any
 
 from hackiathon_reto_tvn.adapters.data.live_fetchers import LiveDataFetcher
 from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository
-from hackiathon_reto_tvn.services.snapshot_audit import COUNTRIES, INDICATORS, audit_snapshot
+from hackiathon_reto_tvn.adapters.data.sqlite_snapshot import SQLiteSnapshotRepository
+from hackiathon_reto_tvn.domain.snapshot_contract import SNAPSHOT_COUNTRIES, SNAPSHOT_INDICATORS
+from hackiathon_reto_tvn.services.snapshot_audit import audit_snapshot
 
 NEWS_FIELDS = (
     "id_noticia",
@@ -119,7 +121,11 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
 
     try:
         fetched_indicators = await fetcher.fetch_world_bank(
-            countries=list(COUNTRIES), indicators=list(INDICATORS), start_year=2010, end_year=2024, strict=True
+            countries=list(SNAPSHOT_COUNTRIES),
+            indicators=list(SNAPSHOT_INDICATORS),
+            start_year=2010,
+            end_year=2024,
+            strict=True,
         )
     except Exception as exc:
         fetched_indicators = []
@@ -176,6 +182,7 @@ async def build_candidate_snapshot(output_dir: Path) -> dict[str, Any]:
     )
 
     LocalStorageRepository().generate_manifest(stage)
+    SQLiteSnapshotRepository.create_from_directory(stage, stage / "snapshot")
     report = audit_snapshot(stage)
     report["source_errors"] = source_errors
     report["ready"] = report["ready"] and not source_errors

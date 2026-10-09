@@ -6,6 +6,8 @@ from itertools import product
 from pathlib import Path
 
 from hackiathon_reto_tvn.adapters.data.loaders import LocalStorageRepository
+from hackiathon_reto_tvn.adapters.data.sqlite_snapshot import SQLiteSnapshotRepository
+from hackiathon_reto_tvn.adapters.data.sqlite_storage import SQLiteStorage
 from hackiathon_reto_tvn.services.snapshot_audit import audit_snapshot
 
 
@@ -100,8 +102,73 @@ def test_complete_candidate_snapshot_passes_the_structural_gate(tmp_path: Path) 
             writer.writerow({"pais_iso3": country, "indicador_id": indicator, "anio": year, "valor": ""})
     (raw_dir / "eventos.geojson").write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
     LocalStorageRepository().generate_manifest(tmp_path)
+    SQLiteSnapshotRepository.create_from_directory(tmp_path, tmp_path / "snapshot")
 
     report = audit_snapshot(tmp_path)
 
     assert report["ready"] is True
     assert all(report["checks"].values())
+
+
+def test_snapshot_audit_rejects_modified_sqlite_package(tmp_path: Path) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    (raw_dir / "noticias.csv").write_text(
+        "id_noticia,titulo,url,medio,idioma,fecha_publicacion,fecha_deteccion,fecha_extraccion,tema,origen,alcance_texto\n",
+        encoding="utf-8",
+    )
+    (raw_dir / "indicadores.csv").write_text(
+        "pais_iso3,indicador_id,anio,valor,unidad,fuente_url,fecha_extraccion,licencia\n", encoding="utf-8"
+    )
+    (raw_dir / "eventos.geojson").write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    LocalStorageRepository().generate_manifest(tmp_path)
+    snapshot = SQLiteSnapshotRepository.create_from_directory(tmp_path, tmp_path / "snapshot")
+    with snapshot.database_path.open("ab") as stream:
+        stream.write(b"tampered")
+
+    report = audit_snapshot(tmp_path)
+
+    assert report["ready"] is False
+    assert report["checks"]["sqlite_snapshot"] is False
+    assert report["sqlite_snapshot"]["valid"] is False
+
+
+def test_snapshot_audit_counts_recent_news_in_sqlite_snapshot_not_only_raw_files(tmp_path: Path) -> None:
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    (raw_dir / "noticias.csv").write_text(
+        "id_noticia,titulo,url,medio,idioma,fecha_publicacion,fecha_deteccion,fecha_extraccion,tema,origen,alcance_texto\n",
+        encoding="utf-8",
+    )
+    (raw_dir / "indicadores.csv").write_text(
+        "pais_iso3,indicador_id,anio,valor,unidad,fuente_url,fecha_extraccion,licencia\n", encoding="utf-8"
+    )
+    (raw_dir / "eventos.geojson").write_text('{"type":"FeatureCollection","features":[]}', encoding="utf-8")
+    LocalStorageRepository().generate_manifest(tmp_path)
+    operational_path = tmp_path / "operational.db"
+    operational = SQLiteStorage(operational_path)
+    operational.init_db()
+    cutoff = date.today().isoformat()
+    operational.upsert_noticias(
+        [
+            {
+                "id_noticia": f"N-{index}",
+                "titulo": f"Noticia pública {index}",
+                "url": f"https://news.example/{index}",
+                "medio": "TVN Noticias" if index < 20 else "Medio público",
+                "fecha_publicacion": cutoff,
+                "fecha_deteccion": cutoff,
+            }
+            for index in range(100)
+        ]
+    )
+    SQLiteSnapshotRepository.create_from_directory(
+        tmp_path,
+        tmp_path / "snapshot",
+        operational_db_path=operational_path,
+    )
+
+    report = audit_snapshot(tmp_path)
+
+    assert report["news"]["within_90_days"] == 100
+    assert report["news"]["tvn_within_90_days"] == 20

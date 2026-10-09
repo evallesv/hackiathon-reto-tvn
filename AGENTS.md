@@ -9,7 +9,7 @@
 
 ## 1. Project Overview
 
-This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation. Additionally, it integrates a persistent SQLite storage layer on Fly.io volumes (`copilot.db` in WAL mode) for periodic live ingestion from RSS, GDELT, World Bank, and USGS, strictly decoupled from the frozen benchmark dataset to maintain 100% deterministic reproducibility.
+This repository implements a production-grade AI copilot for **TVN Media** (editorial news desk) with modular extension for the banking sector. It transforms frozen public datasets (`noticias.csv`, `indicadores.csv`, `eventos.geojson`) into prioritized agenda rankings, traceable evidence case cards, and responsible draft outputs with human-in-the-loop validation. A read-only SQLite snapshot (`data/snapshot/snapshot.sqlite`) packages that corpus for offline local queries; a separate persistent SQLite database on Fly.io volumes (`copilot.db` in WAL mode) supports periodic live ingestion and editorial review.
 
 **Core Architectural Pattern**: Clean Architecture / Hexagonal (Ports & Adapters). Domain rules have zero dependencies on frameworks, network I/O, or specific LLM providers.
 
@@ -236,6 +236,7 @@ hackiathon-reto-tvn/
 │   │   │   └── factory.py                 # Provider factory (get_llm_client)
 │   │   └── data/
 │   │       ├── loaders.py        # Non-blocking CSV, GeoJSON & SHA-256 manifest (frozen data)
+│   │       ├── sqlite_snapshot.py # Read-only reproducible SQLite corpus package
 │   │       ├── live_fetchers.py  # Live RSS, GDELT, World Bank, USGS feed collectors
 │   │       └── sqlite_storage.py # SQLite WAL repository for persistent live feeds
 │   ├── services/             # ORCHESTRATION & USE CASES
@@ -246,6 +247,7 @@ hackiathon-reto-tvn/
 │   └── main.py               # ASGI application entrypoint with background lifespan
 ├── data/
 │   ├── raw/                  # Frozen raw datasets (noticias.csv, indicadores.csv, etc.)
+│   ├── snapshot/              # Read-only SQLite corpus package and hash manifest
 │   ├── storage/              # Local SQLite database (copilot.db) (ignored by git)
 │   ├── manifest.json         # Cryptographic SHA-256 manifest
 │   └── benchmark.jsonl       # 60 benchmark evaluation queries
@@ -369,6 +371,7 @@ These are verified limitations of the current code. Do not assume the behaviour 
 - **`.env` holds real keys and selects the real `opencode` provider.** Never read, print, log, or copy it; use `.env.example` for documentation. Tests force `LLM_PROVIDER=mock` and `DECISION_PROVIDER=mock` via autouse fixture in `tests/conftest.py`: keep it.
 - **`data/manifest.json` is frozen.** Only the deliberate command `make manifest` may regenerate it. Tests that call `generate_manifest` must pass a `tmp_path` copy of `data/`.
 - **Persistent Live Storage vs Frozen Dataset**: Live data ingestion stores real-time feeds in SQLite (`copilot.db`), leaving `data/raw/` and `data/manifest.json` completely untouched. Local development uses `data/storage/` (gitignored).
+- **SQLite Snapshot vs Operational Database**: `data/snapshot/snapshot.sqlite` is a read-only corpus package without editorial review or ingestion-run tables. `data/storage/copilot.db` is mutable operational state. Build the package with `make sqlite-snapshot`; the tool validates the raw manifest and leaves frozen source files unchanged.
 - **Offline test isolation for live ingestion**: `INGESTION_ENABLED="false"` is forced via autouse fixture in `tests/conftest.py` so scheduler and fetchers never trigger network requests in test suites (**T10**).
 - **SQLite Concurrency & WAL mode**: The SQLite adapter enforces `PRAGMA journal_mode=WAL;` and `PRAGMA busy_timeout=5000;` to ensure non-blocking concurrent operations between FastAPI requests and background ingestion.
 - **Fly.io Volume Mount**: On Fly.io, persistent volume `sentria_data` mounts to `/data`, configuring `SQLITE_DB_PATH=/data/copilot.db`.

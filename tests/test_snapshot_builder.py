@@ -7,7 +7,11 @@ from pathlib import Path
 import pytest
 
 from hackiathon_reto_tvn.adapters.data.live_fetchers import LiveDataFetcher
-from hackiathon_reto_tvn.services.snapshot_audit import COUNTRIES, INDICATOR_YEARS, INDICATORS
+from hackiathon_reto_tvn.domain.snapshot_contract import (
+    SNAPSHOT_COUNTRIES,
+    SNAPSHOT_INDICATOR_YEARS,
+    SNAPSHOT_INDICATORS,
+)
 from hackiathon_reto_tvn.services.snapshot_builder import (
     _fetch_gdelt_complete,
     _validate_candidate_path,
@@ -50,7 +54,8 @@ async def test_incomplete_snapshot_is_reported_without_publishing_dataset(
     report = await build_candidate_snapshot(destination)
 
     assert report["ready"] is False
-    assert report["checks"]["indicator_grid"] is False
+    assert report["checks"]["indicator_grid"] is True
+    assert report["indicators"]["null_values"] == 540
     assert not destination.exists()
     assert (tmp_path / "candidate.audit-report.json").is_file()
     assert list(tmp_path.glob(".*.partial")) == []
@@ -99,7 +104,7 @@ async def test_complete_candidate_is_atomically_published(tmp_path: Path, monkey
             "fecha_extraccion": today,
             "licencia": "CC BY 4.0",
         }
-        for country, indicator, year in product(COUNTRIES, INDICATORS, INDICATOR_YEARS)
+        for country, indicator, year in product(SNAPSHOT_COUNTRIES, SNAPSHOT_INDICATORS, SNAPSHOT_INDICATOR_YEARS)
     ]
 
     async def news_result(*args: object, **kwargs: object) -> list[dict[str, object]]:
@@ -123,6 +128,8 @@ async def test_complete_candidate_is_atomically_published(tmp_path: Path, monkey
     assert destination.is_dir()
     assert (destination / "audit-report.json").is_file()
     assert (destination / "raw" / "indicadores.csv").is_file()
+    assert (destination / "snapshot" / "snapshot.sqlite").is_file()
+    assert (destination / "snapshot" / "snapshot_manifest.json").is_file()
     assert not list(tmp_path.glob(".*.partial"))
 
 
