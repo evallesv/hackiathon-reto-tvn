@@ -171,6 +171,16 @@ async def test_draft_citing_unknown_source_is_rejected() -> None:
 
 
 @pytest.mark.asyncio
+async def test_draft_citation_with_valid_id_but_unsupported_details_is_rejected() -> None:
+    draft = await _mock_draft()
+    draft.afirmaciones[0].texto += " y construirá tres puentes."
+    service = CopilotService(settings=Settings(STRICT_CITATION_VERIFICATION=True), llm_client=_CapturingLLM(draft))
+
+    with pytest.raises(ValueError, match="cobertura de citas"):
+        await service.generate_tvn_editorial_package(_caso())
+
+
+@pytest.mark.asyncio
 async def test_generated_draft_requires_human_review_not_auto_approval() -> None:
     service = CopilotService(settings=Settings(), llm_client=MockLLMAdapter())
     caso = _caso()

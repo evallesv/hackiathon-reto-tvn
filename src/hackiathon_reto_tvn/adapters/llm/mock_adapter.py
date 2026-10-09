@@ -73,7 +73,7 @@ class MockLLMAdapter(BaseLLMClient):
                 raise ValueError("El modo mock requiere una fuente y un titular presentes en el caso.")
             cited_id = source_match.group(1)
             source_title = html.unescape(title_match.group(1)).strip()
-            supported_statement = f"El titular recibido reporta: {source_title}"
+            supported_statement = source_title
             data = {
                 "titulo_propuesto": "Tema para verificación editorial",
                 "brief_250": f"{supported_statement}. No se dispone del artículo completo; los detalles requieren verificación.",
@@ -116,7 +116,7 @@ class MockLLMAdapter(BaseLLMClient):
                 raise ValueError("El modo mock requiere una fuente y un titular presentes en el caso.")
             cited_id = source_match.group(1)
             source_title = html.unescape(title_match.group(1)).strip()
-            supported_statement = f"El titular de {cited_id} informa: {source_title}"
+            supported_statement = source_title
             data_bancaria = {
                 "resumen_250": (
                     f"{supported_statement}. La evidencia disponible no demuestra por sí sola un impacto bancario o sectorial."

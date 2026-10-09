@@ -29,7 +29,7 @@ El reto establece requisitos no negociables de seguridad y ética:
 ### Positivas
 * Resistencia a ataques de inyección indirecta provenientes de fuentes públicas (T07).
 * Prevención sistemática de alucinaciones (T06).
-* El validador comprueba que las citas apunten a IDs de fuente permitidos; esto no demuestra que el pasaje respalde semánticamente la afirmación. No hay aún una métrica verificada de sustento semántico en el benchmark.
+* `validate_citation_support` comprueba IDs permitidos, que el fragmento citado aparezca en la evidencia de la ficha y que los términos de contenido de la afirmación estén en ese fragmento. Es un filtro léxico conservador, no una prueba de implicación semántica ni una verificación automática de todas las oraciones libres. La revisión humana sigue siendo obligatoria.
 
 ## Addendum (2026-10-06): aplicación efectiva en `CopilotService`
 

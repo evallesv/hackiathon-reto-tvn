@@ -133,7 +133,7 @@ async def test_generate_banking_bulletin_cu05(copilot_service: CopilotService) -
                     CitaEvidencia(
                         id_fuente="PAN-NY.GDP.MKTP.KD.ZG-2023",
                         campo_o_pasaje="valor",
-                        texto_sustento="7.3%",
+                        texto_sustento="El PIB de Panamá creció 7.3% en 2023.",
                     )
                 ],
             )

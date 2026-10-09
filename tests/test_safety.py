@@ -83,6 +83,58 @@ def test_citation_coverage_flags_missing_citations() -> None:
     assert "carece de citas" in violations[0]
 
 
+def test_citation_support_rejects_details_absent_from_the_cited_passage() -> None:
+    afirmaciones = [
+        Afirmacion(
+            id_afirmacion="AF-DETALLE-NUEVO",
+            texto="El MOP anuncia un plan y construirá tres puentes.",
+            tipo=TipoAfirmacion.HECHO,
+            citas=[
+                CitaEvidencia(
+                    id_fuente="NOT-001",
+                    campo_o_pasaje="titulo",
+                    texto_sustento="El MOP anuncia un plan de vías.",
+                )
+            ],
+        )
+    ]
+
+    coverage, violations = SafetyGuard.validate_citation_support(
+        afirmaciones,
+        valid_source_ids={"NOT-001"},
+        source_passages={"NOT-001": ["El MOP anuncia un plan de vías."]},
+    )
+
+    assert coverage == 0.0
+    assert any("puentes" in violation for violation in violations)
+
+
+def test_citation_support_checks_the_excerpt_not_the_full_source_passage() -> None:
+    afirmaciones = [
+        Afirmacion(
+            id_afirmacion="AF-EXCERPTO-PARCIAL",
+            texto="El MOP anuncia un plan de vías.",
+            tipo=TipoAfirmacion.DECLARACION,
+            citas=[
+                CitaEvidencia(
+                    id_fuente="NOT-001",
+                    campo_o_pasaje="titular",
+                    texto_sustento="El MOP anuncia un plan.",
+                )
+            ],
+        )
+    ]
+
+    coverage, violations = SafetyGuard.validate_citation_support(
+        afirmaciones,
+        valid_source_ids={"NOT-001"},
+        source_passages={"NOT-001": ["El MOP anuncia un plan de vías."]},
+    )
+
+    assert coverage == 0.0
+    assert any("vias" in violation for violation in violations)
+
+
 def test_format_explicit_abstention() -> None:
     msg = SafetyGuard.format_explicit_abstention(
         topic_or_query="Producción de litio en Panamá",

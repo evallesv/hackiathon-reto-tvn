@@ -54,7 +54,7 @@
 
 ## 5. Criterios de Aceptación y Metas del Proyecto
 
-1. **Trazabilidad de citas (T09)**: La meta es que toda afirmación factual cite una fuente pertinente. El validador actual comprueba presencia de IDs permitidos, no sustento semántico; la validez debe medirse mediante revisión humana.
+1. **Trazabilidad de citas (T09)**: La meta es que toda afirmación factual cite una fuente pertinente. El control actual comprueba IDs, fragmentos presentes en la ficha y contención léxica conservadora; no prueba implicación semántica ni valida automáticamente todo el texto libre. La revisión humana sigue siendo necesaria.
 2. **Abstención (T06)**: La meta es abstenerse cuando el corpus no contiene evidencia. Las pruebas de aceptación verifican escenarios controlados; no representan por sí solas una tasa general de desempeño.
 3. **Tratamiento de fuentes no confiables (T07)**: El contenido externo debe permanecer como dato dentro de bloques `<source_data>` y no alterar instrucciones.
 4. **Comparación con baselines**: resultado exploratorio; no se afirma una mejora general. La clasificación actual usa reglas mock y no demuestra una mejora de un modelo real.

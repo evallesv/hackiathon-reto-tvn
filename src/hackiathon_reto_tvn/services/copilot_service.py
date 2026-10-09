@@ -260,9 +260,12 @@ class CopilotService:
             ),
         )
 
-        # Validate citation coverage
+        # Validate source identity, the quoted passage, and claim wording against case evidence.
         valid_sources = set(caso.ids_fuente)
-        coverage, violations = SafetyGuard.validate_citation_coverage(borrador.afirmaciones, valid_sources)
+        source_passages = self._case_source_passages(caso)
+        coverage, violations = SafetyGuard.validate_citation_support(
+            borrador.afirmaciones, valid_sources, source_passages
+        )
 
         if coverage < 1.0:
             logger.warning(f"Advertencia de cobertura de citas ({coverage * 100:.1f}%): {violations}")
@@ -275,6 +278,15 @@ class CopilotService:
         caso.borrador = borrador.model_dump()
         caso.estado_revision = EstadoRevision.EN_REVISION
         return borrador
+
+    @staticmethod
+    def _case_source_passages(caso: FichaCaso) -> Dict[str, List[str]]:
+        """Returns only source excerpts already present in the server-resolved case."""
+        passages: Dict[str, List[str]] = {}
+        for afirmacion in caso.afirmaciones:
+            for cita in afirmacion.citas:
+                passages.setdefault(cita.id_fuente, []).append(cita.texto_sustento)
+        return passages
 
     def _format_claims_as_source_data(self, caso: FichaCaso) -> str:
         """Renders case claims as isolated untrusted <source_data> blocks (anti-injection shield)."""
@@ -339,7 +351,10 @@ class CopilotService:
         )
 
         valid_sources = set(caso.ids_fuente)
-        coverage, violations = SafetyGuard.validate_citation_coverage(borrador.afirmaciones, valid_sources)
+        source_passages = self._case_source_passages(caso)
+        coverage, violations = SafetyGuard.validate_citation_support(
+            borrador.afirmaciones, valid_sources, source_passages
+        )
         if coverage < 1.0 and self.settings.STRICT_CITATION_VERIFICATION:
             raise ValueError(
                 f"Boletín rechazado: cobertura de citas {coverage * 100:.1f}% < 100%. Violaciones: {violations}"

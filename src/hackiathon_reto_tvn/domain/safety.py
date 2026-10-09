@@ -3,13 +3,15 @@
 Rules enforced:
 1. Anti-injection: Source text is strictly DATA, never INSTRUCTION.
    Malicious payloads attempting to hijack instructions or reveal secrets are sanitized.
-2. Anti-hallucination: Zero tolerance for unsourced facts, quotes, or numbers.
-   Explicit abstention when evidence is absent (T06).
-3. Citation validation: 100% of factual assertions must map to a registered evidence ID.
+2. Anti-hallucination: Reject factual assertions with no registered citation or with content terms
+   absent from cited excerpts; abstain when evidence is missing (T06).
+3. Citation support: Strict mode checks registered IDs, quoted passages, and conservative lexical containment.
+   This lexical filter does not establish semantic entailment.
 4. Independent verification: Replicated news wire/agency counts as a single provenance (T02).
 """
 
 import re
+import unicodedata
 from typing import List, Tuple
 
 from hackiathon_reto_tvn.domain.models import Afirmacion, TipoAfirmacion
@@ -42,6 +44,82 @@ class SafetyGuard:
         r"liquidity\s+insolvency|quiebra\s+bancaria",
         r"simula\s+que|detalles\s+inventados|paywall",
     ]
+
+    # Function words and attribution boilerplate do not add factual content to a quotation.
+    SUPPORT_NONFACTUAL_TOKENS = {
+        "a",
+        "al",
+        "ante",
+        "bajo",
+        "con",
+        "contra",
+        "de",
+        "del",
+        "desde",
+        "durante",
+        "e",
+        "el",
+        "ella",
+        "en",
+        "entre",
+        "era",
+        "es",
+        "esa",
+        "ese",
+        "esta",
+        "este",
+        "fue",
+        "ha",
+        "han",
+        "la",
+        "las",
+        "le",
+        "lo",
+        "los",
+        "mas",
+        "más",
+        "o",
+        "para",
+        "por",
+        "que",
+        "se",
+        "segun",
+        "según",
+        "sin",
+        "sobre",
+        "su",
+        "sus",
+        "un",
+        "una",
+        "uno",
+        "unos",
+        "unas",
+        "y",
+        "reporta",
+        "informo",
+        "informó",
+        "indica",
+        "indico",
+        "indicó",
+        "anuncia",
+        "anuncio",
+        "anunció",
+        "afirma",
+        "afirmo",
+        "afirmó",
+        "senala",
+        "señala",
+        "senaló",
+        "señalo",
+        "titular",
+        "fuente",
+        "fuentes",
+        "noticia",
+        "reportado",
+        "reportada",
+        "recibido",
+        "recibida",
+    }
 
     @classmethod
     def sanitize_untrusted_text(cls, text: str) -> Tuple[str, bool]:
@@ -122,6 +200,79 @@ class SafetyGuard:
 
         coverage = (validly_cited / total_factual) if total_factual > 0 else 1.0
         return coverage, violations
+
+    @classmethod
+    def validate_citation_support(
+        cls,
+        afirmaciones: List[Afirmacion],
+        valid_source_ids: set[str],
+        source_passages: dict[str, List[str]],
+    ) -> Tuple[float, List[str]]:
+        """Checks citation IDs and conservatively rejects claim tokens absent from cited passages.
+
+        This lexical containment check is a fail-closed guard, not semantic entailment or
+        independent verification of the source's truthfulness.
+        """
+        factual_types = {TipoAfirmacion.HECHO, TipoAfirmacion.DECLARACION}
+        total_factual = 0
+        supported = 0
+        violations: List[str] = []
+
+        for afirmacion in afirmaciones:
+            if afirmacion.tipo not in factual_types:
+                continue
+            total_factual += 1
+            if not afirmacion.citas:
+                violations.append(f"Afirmación '{afirmacion.id_afirmacion}' carece de citas de evidencia.")
+                continue
+
+            cited_tokens: set[str] = set()
+            invalid_citation = False
+            for cita in afirmacion.citas:
+                if cita.id_fuente not in valid_source_ids:
+                    violations.append(
+                        f"Afirmación '{afirmacion.id_afirmacion}' referencia fuente desconocida '{cita.id_fuente}'."
+                    )
+                    invalid_citation = True
+                    continue
+
+                passages = source_passages.get(cita.id_fuente, [])
+                quote = cls._normalize_evidence_text(cita.texto_sustento)
+                matching_passage = next(
+                    (passage for passage in passages if quote and quote in cls._normalize_evidence_text(passage)),
+                    None,
+                )
+                if matching_passage is None:
+                    violations.append(
+                        f"Afirmación '{afirmacion.id_afirmacion}' cita un pasaje no encontrado en '{cita.id_fuente}'."
+                    )
+                    invalid_citation = True
+                    continue
+                cited_tokens.update(cls._factual_tokens(cita.texto_sustento))
+
+            unsupported_tokens = cls._factual_tokens(afirmacion.texto) - cited_tokens
+            if unsupported_tokens:
+                violations.append(
+                    f"Afirmación '{afirmacion.id_afirmacion}' contiene términos ausentes de los pasajes citados: "
+                    f"{', '.join(sorted(unsupported_tokens))}."
+                )
+                invalid_citation = True
+
+            if not invalid_citation:
+                supported += 1
+
+        coverage = supported / total_factual if total_factual else 1.0
+        return coverage, violations
+
+    @classmethod
+    def _factual_tokens(cls, text: str) -> set[str]:
+        normalized = cls._normalize_evidence_text(text)
+        return {token for token in re.findall(r"[a-z0-9]+", normalized) if token not in cls.SUPPORT_NONFACTUAL_TOKENS}
+
+    @staticmethod
+    def _normalize_evidence_text(text: str) -> str:
+        normalized = unicodedata.normalize("NFKD", text.casefold())
+        return " ".join("".join(char for char in normalized if not unicodedata.combining(char)).split())
 
     @staticmethod
     def format_explicit_abstention(topic_or_query: str, missing_reason: str) -> str:

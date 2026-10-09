@@ -13,7 +13,7 @@ A continuación se detalla la matriz de tareas ejecutadas en el repositorio sigu
 | :--- | :--- | :--- | :--- | :--- |
 | **TSK-01** | `domain/models.py` | Modelado de contratos inmutables: `Noticia`, `Indicador`, `FichaCaso`, `BorradorEditorial`, `BorradorBancario`. | **Completado** | Validación estricta Pydantic v2; campos en `snake_case` (T10). |
 | **TSK-02** | `domain/scoring.py` | Implementación de la fórmula $P = 30R + 25I + 20U + 15N + 10E$ y desempate por urgencia. | **Completado** | Bandas no solapadas [0,40), [40,70), [70,100]. Desempate determinista. |
-| **TSK-03** | `domain/safety.py` | Módulo de seguridad: sanitización de inyecciones de prompt y validación de IDs de cita. | **Parcial** | T07 (aislamiento en `<source_data>`); T09 comprueba IDs permitidos, pero el sustento semántico requiere revisión humana. |
+| **TSK-03** | `domain/safety.py` | Sanitización de inyección y control conservador de ID, fragmento citado y términos de afirmación. | **Parcial** | T07; T09 rechaza términos ausentes del fragmento, pero no evalúa implicación semántica ni extrae cada hecho del texto libre. Requiere revisión humana. |
 | **TSK-04** | `adapters/data/loaders.py` | Carga de CSV y GeoJSON congelados con tolerancia a nulos y fechas no parseables. | **Completado** | T01 (conserva `None` en fechas/números), T04 (preserva año, país, unidad). |
 | **TSK-05** | `adapters/decision/` | Conectores System One: Cloudflare Clef (`@cf/cloudflare/clef`), Jev y Mock offline. | **Implementado; evaluación pendiente** | Los conectores existen; falta medir el proveedor real contra etiquetas humanas. |
 | **TSK-06** | `adapters/llm/` | Conectores System Two: OpenCode (`muse-spark-1.3`), Gemini 2.5 Flash y Mock offline. | **Completado** | Generación de paquetes editoriales estructurados con citas estrictas. |
@@ -66,7 +66,7 @@ gantt
 ### Decisión 4: Protocolo de Citación Estricta en Memoria con Abstención Explícita — [ADR-0011]
 - **Contexto**: La alucinación de datos estadísticos o citas textuales es inaceptable en una redacción periodística.
 - **Decisión**: El motor de respuestas (`answer_query_async`) sólo sintetiza respuestas si localiza fragmentos verificables en el corpus; ante la ausencia de evidencia suficiente emite el marcador canónico `[ABSTENCIÓN EXPLÍCITA]`.
-- **Justificación**: Se alcanza una tasa de cobertura de citas del 100.0% y una tasa de abstención del 100.0% ante consultas no sustentadas en los 60 ítems del benchmark de evaluación.
+- **Justificación**: Las pruebas locales cubren escenarios controlados. No se presenta una tasa general de citas ni abstención; el benchmark disponible no constituye evaluación humana independiente ni valida sustento semántico.
 
 ### Decisión 5: Protección de Rama Principal y Git Rebase Lineal — [ADR-0012]
 - **Contexto**: La integración continua en Fly.io despliega automáticamente a producción ante cualquier push a `main`.
