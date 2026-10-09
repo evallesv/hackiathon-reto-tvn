@@ -34,7 +34,10 @@ async def main() -> None:
     print("-" * 75)
     print(f"  • Total consultas evaluadas:        {summary['total_consultas_ejecutadas']}")
     print(
-        f"  • Cobertura de citas factuales:     {summary['cobertura_citas_porcentaje']}%  (Meta: {summary['meta_cobertura_citas']})"
+        "  • Respuestas con IDs de cita válidos: "
+        f"{summary['respuestas_sustentadas_con_ids_validos_porcentaje']}%  "
+        f"({summary['respuestas_sustentadas_con_ids_validos']}/{summary['consultas_sustentadas_evaluadas']}; "
+        f"meta: {summary['meta_ids_cita_validos']})"
     )
     print(
         f"  • Tasa de abstención explícita:     {summary['tasa_abstencion_porcentaje']}%  (Meta: {summary['meta_tasa_abstencion']})"

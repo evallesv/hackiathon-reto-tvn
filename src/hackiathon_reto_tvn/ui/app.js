@@ -652,8 +652,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const comparisons = data.comparativa_baselines || {};
         const ranking = comparisons.ranking_priorizacion || {};
         const contradictions = comparisons.clasificacion_contradicciones || {};
-        if (Number.isFinite(summary.cobertura_citas_porcentaje)) {
-            elements.metricCitation.textContent = `${summary.cobertura_citas_porcentaje.toFixed(1)}%`;
+        if (Number.isFinite(summary.respuestas_sustentadas_con_ids_validos_porcentaje)) {
+            elements.metricCitation.textContent = `${summary.respuestas_sustentadas_con_ids_validos_porcentaje.toFixed(1)}%`;
         }
         if (Number.isFinite(summary.tasa_abstencion_porcentaje)) {
             elements.metricAbstention.textContent = `${summary.tasa_abstencion_porcentaje.toFixed(1)}%`;

@@ -340,7 +340,7 @@ Before marking any task as done, submitting a PR, or creating a commit, execute 
 - [ ] `uv run ruff check .` returns zero errors.
 - [ ] `uv run ruff format --check .` returns zero reformatting requirements.
 - [ ] `uv run mypy src/` returns `Success: no issues found`.
-- [ ] `uv run pytest` passes 100% of tests (currently 133 tests and T01–T10).
+- [ ] `uv run pytest` passes 100% of tests (currently 134 tests and T01–T10).
 - [ ] `git diff --stat -- data/` shows no changes (tests and features must not mutate the frozen dataset or `data/manifest.json`).
 - [ ] No hardcoded API keys or secrets exist in any file; `.env` was never modified or committed.
 - [ ] New behaviour has a test; a bug fix has a regression test that fails without the fix.

@@ -16,8 +16,8 @@ Todas las pruebas se ejecutan de manera automatizada mediante `pytest` con ejecu
 | **T03** | Una noticia recirculada de años anteriores conserva su fecha de publicación original. | Noticia de mayo de 2022 recirculada en 2024 mantiene `2022-05-10`. | Fecha original preservada; urgencia mitigada ($U=0.20$); alerta emitida. | `test_acceptance_t01_t10.py::test_t03_*` | **PASÓ** |
 | **T04** | Los indicadores históricos del Banco Mundial conservan año exacto, país y unidad. | Consulta sobre PIB 2023 de Panamá devuelve exactamente 7.3% y % anual. | Cifras oficiales exactas sin redondear ni imputar ceros; cita `PAN-NY.GDP...`. | `test_acceptance_t01_t10.py::test_t04_*` | **PASÓ** |
 | **T05** | Versiones contradictorias entre fuentes se exponen lado a lado con verificación pendiente. | Detección de incompatibilidad entre aumento a 45 pies vs restricción a 44 pies. | `hay_contradiccion: True` con explicación side-by-side de discrepancia. | `test_acceptance_t01_t10.py::test_t05_*` | **PASÓ** |
-| **T06** | Una consulta sin evidencia en el corpus emite abstención explícita sin alucinar. | Pregunta sobre proyecciones turísticas 2029 responde `[ABSTENCIÓN EXPLÍCITA]`. | Cero alucinaciones; respuesta canónica de abstención con explicación. | `test_acceptance_t01_t10.py::test_t06_*` | **PASÓ** |
-| **T07** | Intentos de inyección de prompt dentro de fuentes son neutralizados y tratados como datos. | Patrones `"IGNORA INSTRUCCIONES"` neutralizados dentro de `<source_data>`. | Cero fuga de instrucciones del sistema; payload tratado como texto plano. | `test_acceptance_t01_t10.py::test_t07_*` | **PASÓ** |
+| **T06** | Una consulta sin evidencia en el corpus emite abstención explícita sin alucinar. | Pregunta sobre proyecciones turísticas 2029 responde `[ABSTENCIÓN EXPLÍCITA]`. | El caso de prueba recibe la abstención canónica; una prueba no demuestra ausencia general de alucinaciones. | `test_acceptance_t01_t10.py::test_t06_*` | **PASÓ** |
+| **T07** | Intentos de inyección de prompt dentro de fuentes son neutralizados y tratados como datos. | Patrones `"IGNORA INSTRUCCIONES"` neutralizados dentro de `<source_data>`. | El payload probado se neutraliza; la prueba no acredita resistencia frente a todos los ataques. | `test_acceptance_t01_t10.py::test_t07_*` | **PASÓ** |
 | **T08** | Alto puntaje de atención con evidencia insuficiente bloquea publicación de borrador. | Caso con $P = 83.8$ pero evidencia insuficiente no genera borrador. | `can_publish_draft() == False`; borrador vacío; alerta para redacción. | `test_acceptance_t01_t10.py::test_t08_*` | **PASÓ** |
 | **T09** | El brief editorial generado distingue hechos de declaraciones, inferencias e hipótesis. | Las afirmaciones estructuradas incluyen citas cuyo ID y fragmento existen; los términos de contenido deben aparecer en los pasajes citados. | Control léxico conservador sobre `afirmaciones`; no demuestra implicación semántica ni extrae automáticamente todas las afirmaciones del texto libre. | `test_acceptance_t01_t10.py::test_t09_*`, `test_safety.py` | **PARCIAL** |
 | **T10** | Prototipado y demo funcionan sin conexión a internet ni tokens de pago externos. | Suite completa y servidor ejecutan con `mock` provider offline. | Ejecución verde sin red ni credenciales comerciales activas. | `test_acceptance_t01_t10.py::test_t10_*` | **PASÓ** |
@@ -27,8 +27,8 @@ Todas las pruebas se ejecutan de manera automatizada mediante `pytest` con ejecu
 ## 2. Benchmark Formal de 60 Consultas Etiquetadas
 
 Para evaluar de forma cuantitativa y reproducible el desempeño del copiloto frente a baselines estándar, se diseñó y etiquetó un conjunto de **60 consultas evaluativas** en `data/benchmark.jsonl`:
-- **40 consultas de desarrollo (Dev Set)**: Ajuste fino y validación interna.
-- **20 consultas ciegas del jurado (Jury Set)**: Escenarios de evaluación independientes.
+- **40 consultas de desarrollo (Dev Set)**: Iteración interna de reglas y evaluación local.
+- **20 consultas reservadas (Jury Set)**: Están en el repositorio y no son ciegas; requieren custodia externa para una evaluación independiente.
 - **Distribución de Tipologías**:
   - 30 consultas soportadas con hechos en el corpus (TVN, Banco Mundial, USGS).
   - 10 consultas de contradicción factual entre dos versiones.
@@ -45,7 +45,7 @@ La relevancia se infiere con palabras clave; no equivale a una selección indepe
 
 Contradicciones: diez pares sintéticos comparados entre regex y el adaptador de decisión configurado. En modo `mock`, Macro-F1 fue 0.792 para regex y 0.524 para el mock (`mock-clef-offline`). No representa desempeño de un modelo remoto ni una muestra editorial independiente.
 
-Citas/abstención: el evaluador cuenta IDs o marcadores; no valida soporte semántico.
+Citas/abstención: el evaluador comprueba que las respuestas sustentadas tengan IDs resolubles en el corpus y cuenta marcadores; no comprueba que cada afirmación esté citada ni el soporte semántico.
 Latencia: 2.1 ms de mediana en esta ejecución offline determinista; no representa un proveedor real.
 ```
 
@@ -57,7 +57,7 @@ Latencia: 2.1 ms de mediana en esta ejecución offline determinista; no represen
 | :--- | :--- | :--- | :--- |
 | **Ranking de Agenda (CU-01)** | Recencia sobre los mismos cinco casos. | Fórmula de atención sobre el mismo corpus. | Resultado exploratorio: 0/5 frente a 2/5; relevancia por keywords, no etiqueta editorial; mejora relativa no definida con baseline cero. |
 | **Contradicciones** | Regla regex sobre números y verbos de negación. | Predicciones consultando el adaptador de decisión configurado. | En modo mock, Macro-F1 0.792 frente a 0.524; diez pares sintéticos, no representa evaluación editorial independiente. |
-| **Citas y abstención** | No hay baseline. | Recuento de IDs y marcadores de salida. | No mide soporte semántico ni demuestra ausencia de alucinaciones. |
+| **Citas y abstención** | No hay baseline. | Proporción de consultas sustentadas con IDs de fuente resolubles y recuento de marcadores. | No prueba que cada afirmación esté citada, el soporte semántico ni la ausencia de alucinaciones. |
 
 ---
 
@@ -72,6 +72,6 @@ uv run pytest tests/test_acceptance_t01_t10.py -v
 # Ejecutar el benchmark de desarrollo (40 consultas); no ejecuta las 20 etiquetas reservadas expuestas
 make benchmark
 
-# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 133 Tests de Pytest)
+# Ejecutar el Quality Gate completo (Ruff, Format, Mypy, 134 Tests de Pytest)
 make check
 ```

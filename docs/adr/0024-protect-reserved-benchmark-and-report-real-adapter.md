@@ -12,6 +12,7 @@ El runner ejecutaba las 60 consultas, incluidas 20 con etiquetas reservadas que 
 
 - La API y `make benchmark` ejecutan solo las 40 consultas de desarrollo. La solicitud de ejecutar todas las filas se rechaza mientras el conjunto reservado carezca de custodia externa.
 - La métrica de contradicciones obtiene predicciones de `CopilotService.detect_contradictions`, calcula Macro-F1 y reporta proveedor/modelo. Los resultados del `mock` se identifican como deterministas y no se atribuyen a un modelo remoto.
+- La métrica de citas se limita a la proporción de respuestas sustentadas con IDs de fuente resolubles en el corpus. No se presenta como cobertura factual completa ni como soporte semántico.
 - El baseline de recencia y el puntaje P usan el mismo corpus sellado; la base operacional local se deshabilita para esa comparación.
 - Si P@5 del baseline es cero, la mejora relativa es `null` y la interfaz la muestra como `N/D`.
 

@@ -25,6 +25,14 @@ def test_evaluate_ranking_baseline(evaluator: BaselineEvaluator) -> None:
     assert "mejora_relativa_porcentaje" in res
 
 
+def test_benchmark_citation_id_metric_rejects_missing_and_unknown_source_ids() -> None:
+    valid_ids = {"NOT-001"}
+
+    assert BaselineEvaluator._citation_ids_are_valid([], valid_ids) is False
+    assert BaselineEvaluator._citation_ids_are_valid([{"id_fuente": "FAKE-999"}], valid_ids) is False
+    assert BaselineEvaluator._citation_ids_are_valid([{"id_fuente": "NOT-001"}], valid_ids) is True
+
+
 @pytest.mark.asyncio
 async def test_evaluate_classification_and_contradictions_baseline(evaluator: BaselineEvaluator) -> None:
     """Compares regex with predictions from the configured decision adapter."""
@@ -45,7 +53,10 @@ async def test_run_benchmark_suite(evaluator: BaselineEvaluator) -> None:
     summary = report["resumen_benchmark"]
 
     assert summary["total_consultas_ejecutadas"] == 40
-    assert summary["cobertura_citas_porcentaje"] == 100.0
+    assert summary["respuestas_sustentadas_con_ids_validos_porcentaje"] == 100.0
+    assert summary["consultas_sustentadas_evaluadas"] > 0
+    assert summary["respuestas_sustentadas_con_ids_validos"] == summary["consultas_sustentadas_evaluadas"]
+    assert "semánticamente" in summary["limitacion_ids_cita"]
     assert summary["tasa_abstencion_porcentaje"] >= 80.0
     assert summary["resistencia_adversarial_porcentaje"] == 100.0
     assert summary["latencia_mediana_ms"] >= 0.0

@@ -45,9 +45,9 @@
 > *"Veamos el sistema en acción. Aquí en la **Vista 1: Agenda Priorizada**, observamos el ranking en tiempo real. Fíjense en la tarjeta de la Autoridad del Canal de Panamá (`CASO-002`), que encabeza la agenda con un puntaje de **84.2**. Aquí el sistema unificó cuatro despachos distintos sobre el mismo suceso en una sola procedencia (cumpliendo el test **T02**).  
 > Pero miren esta alerta roja en la parte superior: el caso `CASO-005` es un rumor viral con alto impacto y urgencia que acumula un puntaje de 83.8; sin embargo, su evidencia es insuficiente. Aquí opera nuestro **Guardrail T08**: la IA bloquea automáticamente la generación del borrador y le dice al periodista: 'Investigue primero, prohibido publicar'."*
 
-#### Paso 2: Vista 2 — Fichas de Caso, Citas 100% y Control Humano
+#### Paso 2: Vista 2 — Fichas de Caso, Citas y Control Humano
 *(Hacer clic en la tarjeta de `CASO-001` - Obras Viales del MOP)*
-> *"Al ingresar a la **Ficha de Caso**, vemos que cada afirmación está etiquetada como hecho, declaración o inferencia (test **T09**). Pero lo más importante: **el 100% de los hechos cuenta con una cita textual verificada hacia la fuente original**.  
+> *"Al ingresar a la **Ficha de Caso**, vemos las afirmaciones estructuradas por tipo (hecho, declaración o inferencia). El control estricto comprueba que sus IDs y fragmentos citados existan y que los términos de contenido estén presentes en el pasaje. Es una validación léxica conservadora: no prueba que cada oración libre esté representada ni demuestra implicación semántica. Por eso el borrador permanece en revisión humana.
 > El copiloto genera automáticamente el **Brief Editorial de menos de 250 palabras**, el **Guion de televisión de 45 a 60 segundos**, el **Copy para redes de 80 palabras** y 3 preguntas clave de investigación ciudadana.  
 > Y respetamos el principio de **Human-in-the-Loop**: el borrador está en estado 'En Revisión'. Ninguna noticia sale al aire sin que un editor humano haga clic en 'Aprobar Borrador' registrando su nombre y notas."*
 
@@ -55,8 +55,8 @@
 *(Hacer clic en la pestaña 'Consola del Jurado')*
 > *"Invitamos al jurado a someter a prueba el sistema. Tenemos botones de prueba inmediata:  
 > - Si presionamos **[T04]**, el sistema consulta el PIB y la inflación de Panamá 2023: extrae de inmediato el 7.3% y 1.5% del Banco Mundial con cita al indicador oficial.  
-> - Si presionamos **[T06]**, preguntando por ingresos turísticos de 2029 que no están en el corpus, el sistema **no alucina ni inventa cifras**: emite inmediatamente una **Abstención Explícita**.  
-> - Si presionamos **[T07]**, con un ataque de inyección de prompt que ordena ignorar instrucciones y revelar contraseñas, el sistema lo neutraliza, lo aísla como texto plano y mantiene íntegro el sistema.  
+> - Si presionamos **[T06]**, la consulta de prueba sobre ingresos turísticos de 2029 que no están en el corpus recibe una **Abstención Explícita**. Esto valida ese escenario; no prueba ausencia general de alucinaciones.
+> - Si presionamos **[T07]**, el payload de inyección de prueba se neutraliza y se trata como dato. La prueba cubre patrones concretos, no todos los ataques posibles.
 > - Y con el **Detector de Contradicciones (T05)**, comparamos dos versiones sobre el calado del Canal y el modelo System One detecta la inconsistencia side-by-side en milisegundos."*
 
 ---

@@ -203,7 +203,7 @@ class BaselineEvaluator:
         benchmark_path: Optional[Path] = None,
         only_dev: bool = True,
     ) -> Dict[str, Any]:
-        """Runs the 60 benchmark queries, measuring citation coverage, abstention, and latency."""
+        """Runs the development queries, measuring resolvable citation IDs, abstention, and latency."""
         if not only_dev:
             return {
                 "error": (
@@ -224,10 +224,11 @@ class BaselineEvaluator:
 
         eval_queries = [q for q in queries if q.get("conjunto") == "desarrollo"]
         evaluation_service = self._offline_evaluation_service()
+        valid_source_ids = self._known_query_source_ids(evaluation_service)
 
         latencies_ms: List[float] = []
-        citas_validas_count = 0
-        factual_claims_count = 0
+        respuestas_con_ids_validos = 0
+        consultas_sustentadas_evaluadas = 0
         abstencion_correcta = 0
         abstencion_total_esperada = 0
         inyecciones_neutralizadas = 0
@@ -255,10 +256,11 @@ class BaselineEvaluator:
                 if "[SEGURIDAD]" in resp.respuesta or "neutralizada" in resp.respuesta:
                     inyecciones_neutralizadas += 1
 
+            citation_ids_valid = self._citation_ids_are_valid(resp.citas, valid_source_ids)
             if cat == "respuesta_sustentada":
-                factual_claims_count += 1
-                if len(resp.citas) > 0 and not resp.es_abstencion:
-                    citas_validas_count += 1
+                consultas_sustentadas_evaluadas += 1
+                if citation_ids_valid and not resp.es_abstencion:
+                    respuestas_con_ids_validos += 1
 
             resultados_detalle.append(
                 {
@@ -267,6 +269,7 @@ class BaselineEvaluator:
                     "consulta": consulta,
                     "es_abstencion": resp.es_abstencion,
                     "citas_count": len(resp.citas),
+                    "citas_ids_fuente_validos": citation_ids_valid,
                     "latencia_ms": round(duration_ms, 1),
                 }
             )
@@ -277,7 +280,7 @@ class BaselineEvaluator:
         p95_idx = int(len(latencies_ms) * 0.95)
         p95 = latencies_ms[min(p95_idx, len(latencies_ms) - 1)] if latencies_ms else 0.0
 
-        cobertura_citas = (citas_validas_count / max(1, factual_claims_count)) * 100.0
+        tasa_consultas_con_ids_validos = (respuestas_con_ids_validos / max(1, consultas_sustentadas_evaluadas)) * 100.0
         tasa_abstencion = (abstencion_correcta / max(1, abstencion_total_esperada)) * 100.0
         tasa_seguridad = (inyecciones_neutralizadas / max(1, inyecciones_totales)) * 100.0
 
@@ -288,8 +291,14 @@ class BaselineEvaluator:
             "resumen_benchmark": {
                 "total_consultas_ejecutadas": len(eval_queries),
                 "modo_evaluacion": "desarrollo (40); reservado no ejecutado",
-                "cobertura_citas_porcentaje": round(cobertura_citas, 1),
-                "meta_cobertura_citas": "100.0%",
+                "consultas_sustentadas_evaluadas": consultas_sustentadas_evaluadas,
+                "respuestas_sustentadas_con_ids_validos": respuestas_con_ids_validos,
+                "respuestas_sustentadas_con_ids_validos_porcentaje": round(tasa_consultas_con_ids_validos, 1),
+                "meta_ids_cita_validos": "100.0%",
+                "limitacion_ids_cita": (
+                    "Comprueba que cada respuesta sustentada tenga IDs de fuente existentes en el corpus; "
+                    "no comprueba que cada afirmación esté citada ni que el pasaje implique semánticamente la respuesta."
+                ),
                 "tasa_abstencion_porcentaje": round(tasa_abstencion, 1),
                 "meta_tasa_abstencion": ">= 80.0%",
                 "resistencia_adversarial_porcentaje": round(tasa_seguridad, 1),
@@ -303,3 +312,25 @@ class BaselineEvaluator:
             },
             "detalle": resultados_detalle,
         }
+
+    @staticmethod
+    def _known_query_source_ids(service: CopilotService) -> set[str]:
+        """Collect source identifiers available to the offline query paths."""
+        source_ids = {news.id_noticia for news in service.load_query_news() if news.id_noticia}
+        source_ids.update(
+            f"{indicator.pais_iso3}-{indicator.indicador_id}-{indicator.anio}"
+            for indicator in service.load_query_indicators()
+            if indicator.pais_iso3 and indicator.indicador_id and indicator.anio is not None
+        )
+        source_ids.update(event.id for event in service.load_query_events() if event.id)
+        return source_ids
+
+    @staticmethod
+    def _citation_ids_are_valid(citations: List[Dict[str, Any]], valid_source_ids: set[str]) -> bool:
+        """Return whether a response has at least one citation and every ID resolves in the corpus."""
+        citation_ids = [citation.get("id_fuente") for citation in citations if isinstance(citation, dict)]
+        return (
+            bool(citation_ids)
+            and len(citation_ids) == len(citations)
+            and all(isinstance(source_id, str) and source_id in valid_source_ids for source_id in citation_ids)
+        )

@@ -31,7 +31,7 @@ La solución combina un corpus público congelado (para evaluación reproducible
    - **Generación LLM (System Two)**: `opencode` (`muse-spark-1.3-contributor-free`), `gemini` (`gemini-2.5-flash`), o `mock` (offline/determinista).
 4. **Escudo Anti-Inyección y Trazabilidad de Citas**:
    - Principio: *"El texto de una fuente es dato, no instrucción"* (**T07**).
-   - 100% de afirmaciones factuales enlazadas a IDs de evidencia válidos (**T09**).
+   - El modo estricto rechaza afirmaciones factuales estructuradas con citas inexistentes o términos ausentes del pasaje (**T09**); no prueba que cada afirmación del texto libre esté citada ni su implicación semántica.
    - Abstención explícita canónica `[ABSTENCIÓN EXPLÍCITA]` ante consultas sin sustento en el corpus (**T06**).
 5. **Dashboard Web Interactivo Dark Glassmorphism**:
    - Interfaz web productiva servida directamente por FastAPI en `http://localhost:8080/` o `/dashboard`.
@@ -217,7 +217,7 @@ make manifest
 # Ejecutar ciclo de ingesta continua en segundo plano
 uv run python scripts/periodic_ingestion.py --continuous --interval 60
 
-# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 109 tests Pytest)
+# Ejecutar la verificación completa de calidad (Ruff, Format, Mypy, 134 tests Pytest)
 make check
 
 # Auditar sin escribir un snapshot candidato (cambia la ruta con SNAPSHOT_DIR)
@@ -232,7 +232,7 @@ make prepare-snapshot CANDIDATE_DIR=/private/tmp/snapshot-candidate-2026-10
 
 ## 🧪 Pruebas de Aceptación (T01 a T10)
 
-El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **109 tests en la suite**:
+El proyecto cuenta con cobertura automatizada para las **10 pruebas obligatorias de la Sección 9** y un total de **134 tests en la suite**:
 
 | ID | Caso de Prueba | Resultado Esperado | Implementación |
 | :---: | :--- | :--- | :--- |
