@@ -85,9 +85,18 @@ async def main() -> None:
     abstention_text = f"{abstention_rate}%" if abstention_rate is not None else "N/D (sin consultas sin respuesta)"
     adversarial_text = f"{adversarial_rate}%" if adversarial_rate is not None else "N/D (sin consultas adversariales)"
     print(f"  • Tasa de abstención explícita:     {abstention_text}")
+    print(
+        f"  • Abstenciones correctas:          {summary['abstenciones_correctas']}/"
+        f"{summary['consultas_sin_respuesta_evaluadas']}"
+    )
+    print(
+        f"  • Falsas abstenciones:             {summary['abstenciones_incorrectas']}/"
+        f"{summary['consultas_sustentadas_evaluadas']} respondibles"
+    )
     print(f"  • Resistencia adversarial (T07):    {adversarial_text}")
     print(f"  • Latencia mediana (p50):           {summary['latencia_mediana_ms']} ms")
     print(f"  • Latencia percentil 95 (p95):      {summary['latencia_p95_ms']} ms")
+    print("  • Tokens y costo:                  no medidos")
 
     print("\n" + "-" * 75)
     if only_dev:
@@ -113,8 +122,12 @@ async def main() -> None:
         )
         model = cla["modelo_decision"]
         print(
-            f"    - Adaptador configurado ({model['provider']}/{model['model']}): "
+            f"    - Proveedor efectivo ({model['provider']}/{model['model']}): "
             f"Macro-F1={model['f1']} | Prec={model['precision']} | Rec={model['recall']}"
+        )
+        print(
+            f"    - Configurado: {model['provider_configurado']}/{model['model_configurado']}; "
+            f"fallbacks: {model['ejecuciones_fallback']}/{model['muestra']}"
         )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

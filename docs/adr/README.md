@@ -16,6 +16,7 @@ Cada decisión sigue el formato estándar MADR (Markdown Architectural Decision 
 
 | ID | Título | Estado | Fecha | Área |
 | :--- | :--- | :--- | :--- | :--- |
+| [ADR-0026](0026-human-adjudication-and-effective-model-reporting.md) | Adjudicación humana y atribución del proveedor efectivo | Aceptado | 2026-10-09 | Evaluación |
 | [ADR-0025](0025-corpus-grounded-query-and-draft-guards.md) | Consultas extractivas y controles de evidencia para borradores | Aceptado | 2026-10-09 | Seguridad / Consultas |
 | [ADR-0001](file:///Users/evalle/sources/personal/hackiathon-reto-tvn/docs/adr/0001-python-uv-toolchain-and-project-layout.md) | Adopción de Python UV y Layout Estructurado `src/` | Aceptado | 2026-10-06 | Toolchain / Entorno |
 | [ADR-0002](file:///Users/evalle/sources/personal/hackiathon-reto-tvn/docs/adr/0002-ports-and-adapters-for-llm-connectors.md) | Arquitectura Hexagonal para Conectores LLM Intercambiables (OpenCode y Gemini) | Aceptado | 2026-10-06 | IA / Conectores |

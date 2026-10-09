@@ -315,7 +315,7 @@
                             <tr>
                                 <td><strong>Detección de contradicciones, muestra sintética</strong></td>
                                 <td>Regex (Macro-F1: <code id="table-contradiction-regex">—</code>)</td>
-                                <td><span id="table-contradiction-adapter">Adaptador configurado</span> (Macro-F1: <code id="table-contradiction-model">—</code>)</td>
+                                <td><span id="table-contradiction-adapter">Proveedor efectivo</span> (Macro-F1: <code id="table-contradiction-model">—</code>)</td>
                                 <td><span class="badge" id="table-contradiction-delta">—</span></td>
                                 <td>Muestra sintética exploratoria</td>
                             </tr>
@@ -333,6 +333,13 @@
                                 <td><span class="badge">No aplica</span></td>
                                 <td>Coincidencia literal; revisión editorial pendiente</td>
                             </tr>
+                            <tr>
+                                <td><strong>Abstenciones incorrectas</strong></td>
+                                <td>Consultas etiquetadas como respondibles</td>
+                                <td id="table-false-abstentions">—</td>
+                                <td><span class="badge">No aplica</span></td>
+                                <td>Recuento de errores sobre el total respondible</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -342,7 +349,7 @@
             <div class="manifest-verifier-box">
                 <div class="mv-header">
                     <h3>Integridad Criptográfica del Corpus (SHA-256 Manifest)</h3>
-                    <span class="status-pill status-live">100% Verificado</span>
+                    <span class="status-pill">Manifiesto declarado</span>
                 </div>
                 <div class="manifest-cards-grid" id="manifest-cards-container">
                     <!-- Populated by JS -->

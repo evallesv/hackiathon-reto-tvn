@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Number.isFinite(contradictions.modelo_decision?.f1)) {
             const model = contradictions.modelo_decision;
             elements.metricF1.textContent = model.f1.toFixed(3);
-            elements.metricF1Target.textContent = `${model.provider}/${model.model}; muestra de ${model.muestra} pares sintéticos`;
+            elements.metricF1Target.textContent = `${model.provider}/${model.model}; ${model.muestra} pares sintéticos; ${model.ejecuciones_fallback ?? 0} fallbacks`;
             document.getElementById('table-contradiction-model').textContent = model.f1.toFixed(3);
             document.getElementById('table-contradiction-adapter').textContent = `${model.provider}/${model.model}`;
         }
@@ -707,6 +707,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (Number.isFinite(summary.latencia_mediana_ms)) {
             elements.metricLatency.textContent = `${summary.latencia_mediana_ms.toFixed(1)} ms`;
+        }
+        if (Number.isFinite(summary.abstenciones_incorrectas_porcentaje)) {
+            document.getElementById('table-false-abstentions').textContent = (
+                `${summary.abstenciones_incorrectas}/${summary.consultas_sustentadas_evaluadas} `
+                + `(${summary.abstenciones_incorrectas_porcentaje.toFixed(1)}%)`
+            );
         }
     }
 

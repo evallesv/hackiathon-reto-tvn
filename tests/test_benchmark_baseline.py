@@ -1,12 +1,17 @@
 """Tests for BaselineEvaluator, comparative AI baselines, and benchmark execution."""
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+from hackiathon_reto_tvn.adapters.decision.mock_decision_adapter import MockDecisionAdapter
 from hackiathon_reto_tvn.adapters.llm.mock_adapter import MockLLMAdapter
+from hackiathon_reto_tvn.domain.models import QueryResponse
 from hackiathon_reto_tvn.main import app
+from hackiathon_reto_tvn.ports.decision_port import DecisionResult, QuestionDefinition
 from hackiathon_reto_tvn.services.baseline_evaluator import BaselineEvaluator
 from hackiathon_reto_tvn.services.copilot_service import CopilotService
 
@@ -87,6 +92,52 @@ async def test_run_benchmark_suite(evaluator: BaselineEvaluator) -> None:
 
 
 @pytest.mark.asyncio
+async def test_benchmark_reports_false_abstentions_and_failures(
+    evaluator: BaselineEvaluator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = evaluator._offline_evaluation_service()
+    original_answer = service.answer_query_async
+
+    async def false_abstention(consulta: str, modalidad: str = "tvn_editorial") -> QueryResponse:
+        if "crecimiento del PIB de Panamá en 2023" in consulta:
+            return QueryResponse(consulta=consulta, respuesta="[ABSTENCIÓN EXPLÍCITA]", es_abstencion=True, citas=[])
+        return await original_answer(consulta, modalidad)
+
+    monkeypatch.setattr(service, "answer_query_async", false_abstention)
+    monkeypatch.setattr(evaluator, "_offline_evaluation_service", lambda: service)
+    report = await evaluator.run_benchmark_suite()
+
+    assert report["resumen_benchmark"]["abstenciones_incorrectas"] == 1
+    assert report["resumen_benchmark"]["abstenciones_incorrectas_porcentaje"] == 5.0
+    assert "BM-001" in report["fallos"]["abstenciones_incorrectas"]
+    assert report["resumen_benchmark"]["consultas_sin_respuesta_evaluadas"] == 7
+    assert report["resumen_benchmark"]["abstenciones_correctas"] == 7
+    assert report["detalle"][0]["respuesta"] == "[ABSTENCIÓN EXPLÍCITA]"
+
+
+@pytest.mark.asyncio
+async def test_classification_metrics_attribute_mock_fallback_to_actual_provider(evaluator: BaselineEvaluator) -> None:
+    class RemoteWithFallback(MockDecisionAdapter):
+        @property
+        def provider_name(self) -> str:
+            return "cloudflare"
+
+        async def decide(
+            self, state: str | dict[str, Any], questions: Mapping[str, QuestionDefinition]
+        ) -> DecisionResult:
+            return await MockDecisionAdapter().decide(state, questions)
+
+    evaluator.service.decision_client = RemoteWithFallback()
+    report = await evaluator.evaluate_classification_and_contradictions_baseline()
+
+    model = report["modelo_decision"]
+    assert model["provider_configurado"] == "cloudflare"
+    assert model["provider"] == "mock"
+    assert model["ejecuciones_fallback"] == 10
+    assert model["ejecuciones_por_proveedor_modelo"] == {"mock/mock-clef-offline": 10}
+
+
+@pytest.mark.asyncio
 async def test_run_benchmark_suite_refuses_public_reserved_labels(evaluator: BaselineEvaluator) -> None:
     report = await evaluator.run_benchmark_suite(only_dev=False)
 
@@ -113,7 +164,7 @@ async def test_run_benchmark_suite_accepts_only_separately_custodied_jury_file(
     assert report["resumen_benchmark"]["respuestas_correctas_con_fuente_esperada_porcentaje"] == 100.0
     assert report["resumen_benchmark"]["tasa_abstencion_porcentaje"] is None
     assert report["resumen_benchmark"]["resistencia_adversarial_porcentaje"] is None
-    assert report["resumen_benchmark"]["modo_evaluacion"] == "reservado externo (1); custodia separada"
+    assert report["resumen_benchmark"]["modo_evaluacion"] == "reservado externo (1); independencia no verificada"
     assert report["comparativa_baselines"] == {}
     assert "consulta" not in report["detalle"][0]
 

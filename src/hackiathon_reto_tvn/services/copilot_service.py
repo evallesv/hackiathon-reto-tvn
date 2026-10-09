@@ -401,6 +401,9 @@ class CopilotService:
         discrepancia = prob >= 0.5
         return {
             "discrepancia_detectada": discrepancia,
+            "proveedor_efectivo": decision_res.provider_name or "desconocido",
+            "modelo_efectivo": decision_res.model_name or "desconocido",
+            "uso_fallback": decision_res.provider_name != self.decision_client.provider_name,
             "versiones": [texto_a_seguro, texto_b_seguro],
             "probabilidad_discrepancia": prob,
             "estado": "requiere_evidencia" if discrepancia else "consistente",
